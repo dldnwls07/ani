@@ -1,0 +1,40 @@
+﻿git : remote: error: Trace: 
+3a5d98ffcb36e124c094eef5bd26
+f262b9a65563e25d3638ffcb277d
+68610999        
+위치 줄:1 문자:1
++ git push origin main 2>&1 
+| Out-File push_error.txt -E
+ncoding utf8; G ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          
+    : NotSpecified: (remot  
+  e: error: ...8610999      
+      :String) [], Remot    
+eException
+    + FullyQualifiedErrorId 
+    : NativeCommandError
+ 
+remote: error: See https://g
+h.io/lfs for more informatio
+n.        
+remote: error: File node_mod
+ules/next/node_modules/@next
+/swc-win32-x64-msvc/next-swc
+.win32-x64-msvc.node is 117.
+69 MB; this exceeds GitHub's
+ file size limit of 100.00 M
+B        
+remote: error: GH001: Large 
+files detected. You may want
+ to try Git Large File Stora
+ge - https://git-lfs.github.
+com.        
+To https://github.com/dldnwl
+s07/ani.git
+ ! [remote rejected]   main 
+-> main (pre-receive hook de
+clined)
+error: failed to push some r
+efs to 'https://github.com/d
+ldnwls07/ani.git'

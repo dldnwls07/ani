@@ -1,0 +1,7 @@
+/vercel.json
+node_modules
+.next
+.env*
+.DS_Store
+*.local
+
