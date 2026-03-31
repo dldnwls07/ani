@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { differenceInDays, parseISO, addDays } from 'date-fns'
 import { 
   Heart, 
   Calendar, 
@@ -21,8 +22,7 @@ import { useCoupleStore } from '@/hooks/useCoupleStore'
 import { useRealtimeSync } from '@/hooks/useRealtimeSync'
 import { supabaseBrowser } from '@/infrastructure/supabase/client'
 import { User } from '@/domain/user/entities/User'
-import { DatePlannerModal } from '@/components/DatePlannerModal'
-import { ChatBotModal } from '@/components/ChatBotModal'
+import { BottomNav } from '@/components/BottomNav'
 
 export default function DashboardPage() {
   const router = useRouter()
@@ -30,8 +30,7 @@ export default function DashboardPage() {
   const { couple, partner, setPartner } = useCoupleStore()
   const [updateStatusLoading, setUpdateStatusLoading] = useState(false)
   const [showHeartEffect, setShowHeartEffect] = useState(false)
-  const [isDateModalOpen, setIsDateModalOpen] = useState(false)
-  const [isChatModalOpen, setIsChatModalOpen] = useState(false)
+  const [showPokeEffect, setShowPokeEffect] = useState(false)
   const [isMounted, setIsMounted] = useState(false)
   const [showForceReset, setShowForceReset] = useState(false)
 
@@ -82,6 +81,12 @@ export default function DashboardPage() {
     setTimeout(() => setShowHeartEffect(false), 2000)
   }
 
+  // 5. 콕 찌르기 시각 효과
+  const sendPokeEffect = () => {
+    setShowPokeEffect(true)
+    setTimeout(() => setShowPokeEffect(false), 2000)
+  }
+
   // 하이드레이션 전에는 로딩 중으로 표시 (mounted 확인 후에도 데이터 없으면 안내)
   if (!isMounted || !user || !couple) {
     return (
@@ -127,18 +132,71 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      {/* D-Day 카드 - 실제 날짜 계산 (미구현 시 Mock 대입) */}
-      <motion.div 
-        initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-        className="relative overflow-hidden bg-white/70 backdrop-blur-xl border border-white/40 p-6 rounded-3xl shadow-xl shadow-rose-200/50"
-      >
-        <div className="absolute -top-10 -right-10 w-32 h-32 bg-rose-200 rounded-full blur-3xl opacity-50" />
-        <h2 className="text-xs font-bold text-rose-400 uppercase tracking-widest">D-DAY</h2>
-        <div className="flex items-baseline space-x-2 mt-1">
-          <p className="text-4xl font-black text-gray-800">D+124</p>
-          <p className="text-sm font-medium text-gray-400">우리가 만난 지</p>
-        </div>
-      </motion.div>
+      {/* D-Day 카드 - connectionDate 기반 실제 기념일 계산 */}
+      {(() => {
+        if (!couple?.connectionDate) {
+          return (
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+              className="relative overflow-hidden bg-white/70 backdrop-blur-xl border border-white/40 p-6 rounded-3xl shadow-xl shadow-rose-200/50"
+            >
+              <div className="absolute -top-10 -right-10 w-32 h-32 bg-rose-200 rounded-full blur-3xl opacity-50" />
+              <h2 className="text-xs font-bold text-rose-400 uppercase tracking-widest">D-DAY</h2>
+              <div className="flex items-baseline space-x-2 mt-1">
+                <p className="text-4xl font-black text-gray-800">설정 필요</p>
+                <p className="text-sm font-medium text-gray-400">사귄 날을 등록하세요</p>
+              </div>
+            </motion.div>
+          )
+        }
+
+        const startDate = parseISO(couple.connectionDate)
+        // 한국식 D-Day: 당일을 1일로 침
+        const daysCount = differenceInDays(new Date(), startDate) + 1
+        
+        // 다가오는 기념일 리스트 (100일, 200일 ... 1주년, 2주년 등)
+        const milestones = [100, 200, 300, 365, 400, 500, 600, 700, 730, 800, 900, 1000, 1095]
+        let upcoming = null
+        for (const m of milestones) {
+           const targetDate = addDays(startDate, m - 1)
+           const remain = differenceInDays(targetDate, new Date())
+           if (remain >= 0) {
+             const label = m === 365 ? '1주년' : m === 730 ? '2주년' : m === 1095 ? '3주년' : `${m}일`
+             upcoming = { label, remain }
+             break
+           }
+        }
+
+        return (
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+            className="flex flex-col relative overflow-hidden bg-white/70 backdrop-blur-xl border border-white/40 p-6 rounded-3xl shadow-xl shadow-rose-200/50"
+          >
+            <div className="absolute -top-10 -right-10 w-32 h-32 bg-rose-200 rounded-full blur-3xl opacity-50" />
+            <div className="relative z-10">
+              <h2 className="text-xs font-bold text-rose-400 uppercase tracking-widest">D-DAY</h2>
+              <div className="flex flex-col items-start mt-1">
+                <div className="flex items-baseline space-x-2">
+                  <p className="text-4xl font-black text-gray-800">
+                    D+{daysCount}
+                  </p>
+                  <p className="text-sm font-medium text-gray-400">
+                    우리가 만난 지
+                  </p>
+                </div>
+                {upcoming && (
+                  <div className="mt-4 flex items-center space-x-1.5 bg-rose-50/80 border border-rose-100 rounded-full px-3 py-1.5 shadow-sm">
+                    <Sparkles className="w-3.5 h-3.5 text-rose-500" />
+                    <p className="text-xs font-bold text-rose-500">
+                      다가오는 {upcoming.label} (D-{upcoming.remain === 0 ? 'DAY' : upcoming.remain})
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        );
+      })()}
 
       {/* 파트너 상태 위젯 (핵심!) */}
       <section className="bg-white rounded-[2rem] p-8 shadow-2xl shadow-rose-100/50 border border-rose-50 flex flex-col items-center relative overflow-hidden">
@@ -166,7 +224,10 @@ export default function DashboardPage() {
         </p>
 
         <div className="grid grid-cols-2 gap-3 mt-8 w-full">
-          <button className="flex items-center justify-center space-x-2 px-4 py-3 bg-rose-50 text-rose-500 rounded-2xl hover:bg-rose-100 transition active:scale-95 font-bold text-sm shadow-sm ring-1 ring-rose-100/50">
+          <button 
+            onClick={sendPokeEffect}
+            className="flex items-center justify-center space-x-2 px-4 py-3 bg-rose-50 text-rose-500 rounded-2xl hover:bg-rose-100 transition active:scale-95 font-bold text-sm shadow-sm ring-1 ring-rose-100/50"
+          >
             <Hand className="w-4 h-4" />
             <span>콕 찌르기</span>
           </button>
@@ -201,43 +262,8 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      {/* 하단 퀵 메뉴 */}
-      <nav className="fixed bottom-6 left-5 right-5 h-16 bg-white/80 backdrop-blur-2xl rounded-3xl border border-white/50 shadow-2xl flex items-center justify-around px-2 z-50">
-        <Link href="/dashboard" className="flex flex-col items-center text-rose-500">
-          <Sparkles className="w-6 h-6" />
-          <span className="text-[10px] font-bold mt-1">홈</span>
-        </Link>
-        <Link href="/calendar" className="flex flex-col items-center text-gray-400 hover:text-rose-400 transition-colors">
-          <Calendar className="w-6 h-6" />
-          <span className="text-[10px] font-bold mt-1">달력</span>
-        </Link>
-        <button 
-          onClick={() => setIsChatModalOpen(true)}
-          className="flex flex-col items-center text-gray-400 hover:text-rose-400 transition-all active:scale-95"
-        >
-          <div className="w-12 h-12 bg-gradient-to-tr from-rose-400 to-pink-500 rounded-2xl flex items-center justify-center -mt-10 shadow-lg shadow-rose-200 border-2 border-white">
-            <Heart className="w-6 h-6 text-white fill-white" />
-          </div>
-          <span className="text-[10px] font-bold mt-1 text-rose-500">우리</span>
-        </button>
-        <button 
-          onClick={() => setIsDateModalOpen(true)}
-          className="flex flex-col items-center text-gray-400 hover:text-rose-400 transition-colors"
-        >
-          <Sun className="w-6 h-6" />
-          <span className="text-[10px] font-bold mt-1">데이트</span>
-        </button>
-        <Link href="/wishlist" className="flex flex-col items-center text-gray-400 hover:text-rose-400 transition-colors">
-          <Bookmark className="w-6 h-6" />
-          <span className="text-[10px] font-bold mt-1">위물</span>
-        </Link>
-      </nav>
-
-      {/* 실시간 데이트 플래너 모달 */}
-      <DatePlannerModal isOpen={isDateModalOpen} onClose={() => setIsDateModalOpen(false)} />
-
-      {/* 실시간 AI 비서 채팅 모달 */}
-      <ChatBotModal isOpen={isChatModalOpen} onClose={() => setIsChatModalOpen(false)} />
+      {/* 공통 하단 네비게이션 (채팅/데이트 모달 내장) */}
+      <BottomNav />
 
       {/* 하트 발송 시각 효과 */}
       <AnimatePresence>
@@ -249,6 +275,22 @@ export default function DashboardPage() {
             className="fixed inset-0 flex items-center justify-center pointer-events-none z-[100]"
           >
             <Heart className="w-20 h-20 text-pink-500 fill-pink-500" />
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {/* 콕 찌르기 시각 효과 */}
+      <AnimatePresence>
+        {showPokeEffect && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.5, x: 50, rotate: 15 }}
+            animate={{ opacity: 1, scale: 1.5, x: -50, rotate: -15 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            className="fixed inset-0 flex items-center justify-center pointer-events-none z-[100]"
+          >
+            <div className="bg-white px-6 py-4 rounded-full shadow-2xl border-4 border-rose-100 flex items-center space-x-3 transform -rotate-12">
+              <Hand className="w-8 h-8 text-rose-400" />
+              <span className="text-xl font-black text-rose-500 tracking-wider">콕!</span>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

@@ -12,7 +12,7 @@ export function ChatBotModal({ isOpen, onClose }: { isOpen: boolean, onClose: ()
   const { user } = useAuthStore()
   const { couple, partner } = useCoupleStore()
   const [messages, setMessages] = useState<any[]>([
-    { id: 'welcome', sender_id: null, content: '안녕하세요! 두 분의 로맨틱한 일상을 돕는 AI 비서 ani입니다. 무엇이든 물어보세요! 💞', created_at: new Date() }
+    { id: 'welcome', sender_id: null, content: '안녕하세요! 두 분의 로맨틱한 일상을 돕는 우리사이 AI 비서입니다. 무엇이든 물어보세요! 💞', created_at: new Date() }
   ])
   const [inputValue, setInputValue] = useState('')
   const [isTyping, setIsTyping] = useState(false)
@@ -68,7 +68,7 @@ export function ChatBotModal({ isOpen, onClose }: { isOpen: boolean, onClose: ()
                   <Heart className="w-5 h-5 fill-white" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-black text-gray-800 tracking-tight">ani Assistant</h2>
+                  <h2 className="text-lg font-black text-gray-800 tracking-tight">우리사이 AI</h2>
                   <p className="text-[10px] font-bold text-rose-400 flex items-center gap-1">
                     <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" /> AI 커플 비서 작동 중
                   </p>
@@ -115,7 +115,7 @@ export function ChatBotModal({ isOpen, onClose }: { isOpen: boolean, onClose: ()
                 <div className="flex justify-start">
                   <div className="flex items-center space-x-2 bg-gray-50 px-4 py-3 rounded-2xl rounded-bl-none border border-gray-100 text-gray-300">
                     <Loader2 className="w-4 h-4 animate-spin text-pink-400" />
-                    <span className="text-xs font-bold italic">ani가 생각하는 중...</span>
+                    <span className="text-xs font-bold italic">AI가 생각하는 중...</span>
                   </div>
                 </div>
               )}

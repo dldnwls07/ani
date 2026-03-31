@@ -40,7 +40,7 @@ export class ChatUseCase {
         return { data: null, error: `${error} (${details || ''})` }
       }
       return { data, error: null }
-    } catch (e: any) {
+    } catch (e: unknown) {
       return { data: null, error: 'AI 연결에 실패했습니다.' }
     }
   }

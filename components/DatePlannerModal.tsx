@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Heart, Sparkles, MapPin, Clock, Calendar, Check, X, Loader2 } from 'lucide-react'
 import { datePlannerUseCase, DateCourse } from '@/application/schedule/usecases/DatePlannerUseCase'
+import { scheduleUseCase } from '@/application/schedule/usecases/ScheduleUseCase'
 import { useAuthStore } from '@/hooks/useAuthStore'
 import { useCoupleStore } from '@/hooks/useCoupleStore'
 
@@ -11,6 +12,7 @@ export function DatePlannerModal({ isOpen, onClose }: { isOpen: boolean, onClose
   const { user } = useAuthStore()
   const { couple } = useCoupleStore()
   const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [recommendation, setRecommendation] = useState<DateCourse | null>(null)
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
 
@@ -24,8 +26,37 @@ export function DatePlannerModal({ isOpen, onClose }: { isOpen: boolean, onClose
     setLoading(false)
   }
 
-  const handleAddSchedules = () => {
-    // 코스 전체를 일정에 추가하는 로직 (이후 구현)
+  const handleAddSchedules = async () => {
+    if (!recommendation || !user || !couple) return
+    setSaving(true)
+    
+    try {
+      // AI 추천 코스의 각 아이템을 실제 일정으로 등록
+      for (const item of recommendation.items) {
+        const [hours, minutes] = item.time.split(':').map(Number)
+        const startDate = new Date(selectedDate)
+        startDate.setHours(hours, minutes, 0, 0)
+        
+        const endDate = new Date(startDate)
+        endDate.setHours(endDate.getHours() + 1) // 기본 1시간 단위
+
+        await scheduleUseCase.createSchedule({
+          coupleId: couple.id,
+          creatorId: user.id,
+          title: `${item.place} (AI 추천)`,
+          description: item.recommendation,
+          startDatetime: startDate.toISOString(),
+          endDatetime: endDate.toISOString(),
+          isAllDay: false,
+          scheduleType: 'SHARED',
+          locationData: { name: item.place }
+        })
+      }
+    } catch (e) {
+      console.error('[DatePlanner] Failed to save schedules:', e)
+    }
+    
+    setSaving(false)
     onClose()
   }
 
@@ -139,9 +170,17 @@ export function DatePlannerModal({ isOpen, onClose }: { isOpen: boolean, onClose
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 mt-4">
-                  <button onClick={() => setRecommendation(null)} className="py-4 bg-gray-50 text-gray-500 font-bold rounded-2xl hover:bg-gray-100 transition shadow-sm">다시 추천기</button>
-                  <button onClick={handleAddSchedules} className="py-4 bg-rose-500 text-white font-bold rounded-2xl flex items-center justify-center gap-2 hover:bg-rose-600 transition shadow-lg shadow-rose-200">
-                    <Heart className="w-4 h-4 fill-white" /> 전체 일정 등록
+                  <button onClick={() => setRecommendation(null)} className="py-4 bg-gray-50 text-gray-500 font-bold rounded-2xl hover:bg-gray-100 transition shadow-sm">다시 추천받기</button>
+                  <button 
+                    onClick={handleAddSchedules} 
+                    disabled={saving}
+                    className="py-4 bg-rose-500 text-white font-bold rounded-2xl flex items-center justify-center gap-2 hover:bg-rose-600 transition shadow-lg shadow-rose-200 disabled:opacity-60"
+                  >
+                    {saving ? (
+                      <><Loader2 className="w-4 h-4 animate-spin" /> 등록 중...</>
+                    ) : (
+                      <><Heart className="w-4 h-4 fill-white" /> 전체 일정 등록</>
+                    )}
                   </button>
                 </div>
               </motion.div>

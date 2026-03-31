@@ -1,33 +1,29 @@
-'use client'
-
-import { useEffect, useState } from 'react'
+import { Metadata, Viewport } from 'next'
 import './globals.css'
-import { Inter } from 'next/font/google'
+import ClientLayout from './ClientLayout'
 
-const inter = Inter({ subsets: ['latin'] })
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+}
+
+export const metadata: Metadata = {
+  title: '우리사이 - 커플 라이프 매니지먼트',
+  description: 'AI가 조율하고 함께 기록하는 우리 둘만의 소중한 공간',
+}
 
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
   return (
     <html lang="ko" suppressHydrationWarning>
-      <body className={`${inter.className} min-h-screen max-w-md mx-auto relative bg-slate-50 shadow-2xl overflow-x-hidden`}>
-        {/* 하이드레이션 완료 전까지는 투명하게 유지하되, 서버와 스타일 충돌 방지 */}
-        <main 
-          className="min-h-screen bg-white relative transition-opacity duration-300" 
-          style={mounted ? { opacity: 1 } : { opacity: 0 }}
-        >
-          {children}
-        </main>
-      </body>
+      <ClientLayout>
+        {children}
+      </ClientLayout>
     </html>
   )
 }

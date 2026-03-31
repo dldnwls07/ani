@@ -7,6 +7,7 @@ import { wishlistUseCase } from '@/application/wishlist/usecases/WishlistUseCase
 import { useAuthStore } from '@/hooks/useAuthStore'
 import { useCoupleStore } from '@/hooks/useCoupleStore'
 import { WishItem, WishCategory } from '@/domain/wishlist/entities/WishItem'
+import { BottomNav } from '@/components/BottomNav'
 import Link from 'next/link'
 
 export default function WishlistPage() {
@@ -87,7 +88,7 @@ export default function WishlistPage() {
       {/* 카테고리 탭 (생략 가능) */}
 
       {/* 리스트 */}
-      <div className="p-6 space-y-4">
+      <div className="p-6 pb-28 space-y-4">
         {wishlist.length > 0 ? (
           wishlist.map((wish) => (
             <motion.div 
@@ -206,6 +207,9 @@ export default function WishlistPage() {
           </>
         )}
       </AnimatePresence>
+
+      {/* 공통 하단 네비게이션 */}
+      <BottomNav />
     </div>
   )
 }

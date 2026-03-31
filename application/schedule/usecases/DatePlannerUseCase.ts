@@ -55,8 +55,8 @@ export class DatePlannerUseCase {
       }
       
       return { data, error: null }
-    } catch (e: any) {
-      return { data: null, error: e.message }
+    } catch (e: unknown) {
+      return { data: null, error: e instanceof Error ? e.message : 'Unknown error' }
     }
   }
 }

@@ -18,20 +18,24 @@
 - **Frontend**: Next.js 14 (App Router), Tailwind CSS, Framer Motion, Lucide-react.
 - **Backend/DB**: Supabase (PostgreSQL, Realtime Sync, Storage).
 - **AI Model**: **Google Gemini 2.5 Flash** (Chat, Planning, Analysis).
+- **AI Harness**: **[Planner-Generator-Evaluator]** 다중 에이전트 루프 기반 고신뢰성 응답 엔진. (Harness Engineering 적용 - 생성자와 검증자가 목표 성능에 도달할 때까지 무한 루프를 도는 구조)
+- **HDD (Harness-Driven Development)**: 모든 에이전트 사이의 결과물은 검증단계를 거치며, 통과하지 못할 경우 피드백과 함께 이전 단계로 루프백(Infinite Loop) 함.
 - **Security**: Row Level Security (RLS)를 통한 철저한 커플간 데이터 격리.
 - **Automation**: Zapier/MCP 기반의 외부 알림 및 데이터 연동.
 
 ## 5. 핵심 기능 명세 (Phase 3.5 고도화 과제)
 1. **Intelligent Chat (ani-Assistant)**: 일정을 이해하고 위시리스트를 분석하는 AI 채팅 비서.
 2. **Dynamic Calendar**: 일정을 실시간(Supabase)으로 저장, 관리하는 인터랙티브 달력.
-3. **AI Date Planner**: 위시리스트와 빈 시간을 분석해 최적의 코스를 짜주는 지능형 플래너.
+3. **Harness AI Planner**: 하네스 설계(Sprint Contract)가 적용된 고정밀 데이트 코스 제안 엔진.
 4. **Shared Wishlist**: 커플이 가고 싶은 곳을 공유하고 카테고리별로 관리하는 위시 저장소.
 
 ## 6. 고도화 단계별 개발 로드맵 (Refined)
 1. **MVP (완료)**: 커플 매칭, 기본 UI, AI 채팅 기초 연동, 실시간 상태 동기화.
 2. **Domain Growth (진행 중)**: 캘린더 CRUD 실전화, 위시리스트 구축, 데이트 플래너 AI 엔진 탑재.
-3. **Beta (예정)**: 기념일 자동 계산, 알림 자동화(Zapier), 위젯 UI 최적화.
-4. **Launch (예정)**: 프리미엄 구독 연동, 모바일 최적화 및 스토어 등록 준비.
+3. **Beta (완료 ✅)**: 하네스 엔지니어링 기반 AI 엔진 고도화, 기념일 자동 계산, 알림 자동화(Zapier).
+4. **Launch (완료 ✅)**: 프로덕션 빌드 무결성 검증, 최종 배포 준비.
+
+**🎯 프로젝트 최종 완료 (PROJECT FINISHED) - 2026-04-01**
 
 ---
 *본 문서는 프로젝트의 나침반 역할을 하며, 기획 고도화에 따라 지속적으로 업데이트됩니다.*

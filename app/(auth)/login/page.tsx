@@ -89,7 +89,7 @@ export default function AuthPage() {
           >
             <Heart className="w-8 h-8 text-white fill-white" />
           </motion.div>
-          <h1 className="text-2xl font-extrabold text-gray-800">ani</h1>
+          <h1 className="text-2xl font-extrabold text-gray-800">우리사이</h1>
           <p className="text-sm text-gray-400 mt-1">우리만의 공간</p>
         </div>
 

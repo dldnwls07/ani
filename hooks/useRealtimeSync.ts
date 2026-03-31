@@ -1,15 +1,14 @@
 import { useEffect } from 'react'
 import { useAuthStore } from './useAuthStore'
 import { useCoupleStore } from './useCoupleStore'
+import { supabaseBrowser } from '@/infrastructure/supabase/client'
 
-// 개발 모드에서는 실제 DB 호출을 하지 않음
-// 나중에 실제 인증이 붙으면 Supabase Realtime 구독으로 교체
 export function useRealtimeSync() {
   const { user } = useAuthStore()
-  const { couple } = useCoupleStore()
+  const { couple, partner, setPartner } = useCoupleStore()
 
   useEffect(() => {
-    if (!user || !couple) return
+    if (!user || !couple || !partner) return
 
     // 개발 모드: 가짜 UUID일 때는 DB 호출 스킵
     const isDevMode = user.id.startsWith('00000000')
@@ -18,11 +17,25 @@ export function useRealtimeSync() {
       return
     }
 
-    // TODO: 실제 인증 완료 후 아래 코드 활성화
-    // const channel = supabaseBrowser
-    //   .channel(`partner-status-${partnerId}`)
-    //   .on('postgres_changes', { ... })
-    //   .subscribe()
-    // return () => { supabaseBrowser.removeChannel(channel) }
-  }, [user, couple])
+    const channel = supabaseBrowser
+      .channel(`partner-status-${partner.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${partner.id}` },
+        (payload: any) => {
+          if (payload.new) {
+            setPartner({
+              ...partner,
+              statusMessage: payload.new.status_message,
+              statusUpdatedAt: payload.new.status_updated_at
+            })
+          }
+        }
+      )
+      .subscribe()
+
+    return () => { 
+      supabaseBrowser.removeChannel(channel) 
+    }
+  }, [user, couple, partner, setPartner])
 }
