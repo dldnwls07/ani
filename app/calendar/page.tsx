@@ -228,9 +228,9 @@ export default function CalendarPage() {
   ) : []
 
   return (
-    <div className="flex flex-col min-h-screen bg-white">
+    <div className="flex flex-col h-screen bg-white overflow-hidden">
       {/* 헤더 */}
-      <header className="p-6 pt-10 flex justify-between items-center bg-white sticky top-0 z-50 shadow-sm border-b border-gray-50/50">
+      <header className="p-6 pt-10 flex justify-between items-center bg-white shrink-0 shadow-sm border-b border-gray-50/50">
         <Link href="/dashboard" className="p-2 -ml-2 text-gray-400 hover:text-rose-400 transition-colors">
           <ChevronLeft className="w-6 h-6" />
         </Link>
@@ -244,12 +244,12 @@ export default function CalendarPage() {
       </header>
 
       {/* 요일 라벨 */}
-      <div className="grid grid-cols-7 px-4 py-4 text-center text-[10px] font-black tracking-widest text-gray-400 uppercase">
+      <div className="grid grid-cols-7 px-4 py-4 text-center text-[10px] font-black tracking-widest text-gray-400 uppercase shrink-0">
         {['일', '월', '화', '수', '목', '금', '토'].map(d => <div key={d}>{d}</div>)}
       </div>
 
       {/* 캘린더 그리드 */}
-      <div className="grid grid-cols-7 px-4 gap-y-2 pb-6">
+      <div className="grid grid-cols-7 px-4 gap-y-2 pb-4 shrink-0">
         {calendarDays.map((day, idx) => {
           const hasSchedule = schedules.some(s => format(new Date(s.start_datetime || s.startDatetime), 'yyyy-MM-dd') === format(day, 'yyyy-MM-dd'))
           const isCurrentMonth = isSameMonth(day)
@@ -287,8 +287,9 @@ export default function CalendarPage() {
         })}
       </div>
 
-      {/* 선택된 날짜 상세 & 일정 */}
-      <div className="flex-1 bg-gray-50/50 rounded-t-[3rem] p-8 border-t border-white shadow-2xl space-y-6">
+      {/* 선택된 날짜 상세 & 일정 - 독립 스크롤 영역 */}
+      <div className="flex-1 bg-gray-50/50 rounded-t-[3rem] border-t border-white shadow-2xl overflow-y-auto overscroll-contain">
+        <div className="p-8 space-y-6 pb-48">
         <div className="flex justify-between items-center px-2">
           <div className="flex items-center space-x-2">
             <span className="text-2xl font-black text-gray-800">{format(selectedDate, 'd')}일</span>
@@ -364,12 +365,13 @@ export default function CalendarPage() {
         </div>
 
         {/* AI 데이트 추천 섹션 */}
-        <div className="pt-4 border-t border-gray-100">
-          {!aiRecommendation && !isAiLoading ? (
-            <button
-              onClick={handleAiRecommendation}
-              className="w-full py-4 bg-gradient-to-r from-indigo-500 via-purple-500 to-rose-500 rounded-2xl flex items-center justify-center space-x-2 text-white shadow-lg shadow-purple-200 active:scale-[0.98] transition-transform"
-            >
+        {selectedSchedules.length > 0 && (
+          <div className="pt-4 border-t border-gray-100">
+            {!aiRecommendation && !isAiLoading ? (
+              <button
+                onClick={handleAiRecommendation}
+                className="w-full py-4 bg-gradient-to-r from-indigo-500 via-purple-500 to-rose-500 rounded-2xl flex items-center justify-center space-x-2 text-white shadow-lg shadow-purple-200 active:scale-[0.98] transition-transform"
+              >
               <Bot className="w-5 h-5" />
               <span className="font-extrabold flex items-center">
                 AI 코스 조율하기 <Sparkles className="w-4 h-4 ml-1 text-yellow-300" />
@@ -415,6 +417,8 @@ export default function CalendarPage() {
               </p>
             </motion.div>
           )}
+          </div>
+        )}
         </div>
       </div>
 

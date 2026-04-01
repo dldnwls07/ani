@@ -45,6 +45,8 @@
 - [x] **[기능] 콕 찌르기 인터랙션 구현** (@fe-dev)
 - [x] **[기능] 실시간 동기화(Realtime) 활성화** (@be-dev)
 - [x] **[AI] 하네스 엔지니어링 Multi-Agent 루프 실제 구현** (@agent-skill-dev)
+- [x] **[버그] 캘린더 페이지 하단 AI 버튼 BottomNav 겹침/가림 현상 해결 및 QA 검증 완료** (@fe-dev, @qa-tester)
+- [x] **[UI/UX] 캘린더 상세 섹션 스크롤링 하단 여백 스페이서(h-40) 추가** (@fe-dev)
 
 ### Phase 4: 외부 연동 및 자동화 (완료 ✅)
 - [x] 외부 알림 연동 및 자동화(Zapier/MCP) 설계 및 Edge Function 작성 (@automation-eng)
@@ -57,6 +59,6 @@
 - [x] GitHub 저장소(origin/main) 동기화 및 푸시 (@git-manager)
 
 ---
-*마지막 업데이트: 2026-04-01 02:00 KST | @ops-manager*
+*마지막 업데이트: 2026-04-01 10:35 KST | @qa-tester*
 **STATUS: PROJECT FINISHED (모든 개발 플로우 완료 🚀)**
 

@@ -1,11 +1,11 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+
 
 // 이 Edge Function은 Supabase Database Webhook에 의해 호출됩니다.
 // 예: schedules 테이블에 새로운 일정이 추가(INSERT)될 때 Zapier 메일/슬랙 알림 전송.
 
 const ZAPIER_WEBHOOK_URL = Deno.env.get("ZAPIER_WEBHOOK_URL") || "https://hooks.zapier.com/hooks/catch/12345/abcde";
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   try {
     // 보안 검증 (Supabase Webhook Secret)
     const authHeader = req.headers.get('Authorization')
