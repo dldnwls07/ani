@@ -8,6 +8,25 @@ import { UUID, Result } from '@/domain/shared/types'
 const IS_MOCK_UUID = (id: string) => id.startsWith('00000000-0000-0000-0000-000000000');
 
 export class ScheduleUseCase {
+  // DB snake_case 데이터를 도메인 entity(camelCase)로 변환
+  private mapToEntity(row: any): Schedule {
+    if (!row) return row;
+    return {
+      id: row.id,
+      coupleId: row.couple_id,
+      creatorId: row.creator_id,
+      title: row.title,
+      description: row.description,
+      startDatetime: row.start_datetime,
+      endDatetime: row.end_datetime,
+      isAllDay: row.is_all_day,
+      locationData: row.location_data,
+      scheduleType: row.schedule_type,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    }
+  }
+
   // 해당 월의 커플 일정 조회
   async getMonthlySchedules(coupleId: UUID, year: number, month: number): Promise<Result<Schedule[]>> {
     if (IS_MOCK_UUID(coupleId)) {
@@ -27,7 +46,7 @@ export class ScheduleUseCase {
       .order('start_datetime', { ascending: true })
 
     if (error) return { data: null, error: error.message }
-    return { data: data as Schedule[], error: null }
+    return { data: (data || []).map(row => this.mapToEntity(row)), error: null }
   }
 
   // 일정 생성
@@ -57,26 +76,36 @@ export class ScheduleUseCase {
       .single()
 
     if (error) return { data: null, error: error.message }
-    return { data: data as Schedule, error: null }
+    return { data: this.mapToEntity(data), error: null }
   }
 
   // 일정 수정
   async updateSchedule(id: UUID, data: Partial<Schedule>): Promise<Result<Schedule>> {
+    const updatePayload: Record<string, any> = {}
+    if (data.title !== undefined) updatePayload.title = data.title
+    if (data.description !== undefined) updatePayload.description = data.description
+    if (data.startDatetime !== undefined) updatePayload.start_datetime = data.startDatetime
+    if (data.endDatetime !== undefined) updatePayload.end_datetime = data.endDatetime
+    if (data.isAllDay !== undefined) updatePayload.is_all_day = data.isAllDay
+    if (data.locationData !== undefined) updatePayload.location_data = data.locationData
+    if (data.scheduleType !== undefined) updatePayload.schedule_type = data.scheduleType
+
     const { data: updated, error } = await supabaseBrowser
       .from('schedules')
-      .update(data)
+      .update(updatePayload)
       .eq('id', id)
       .select()
       .single()
 
     if (error) return { data: null, error: error.message }
-    return { data: updated as Schedule, error: null }
+    return { data: this.mapToEntity(updated), error: null }
   }
 
   // 일정 삭제
   async deleteSchedule(id: UUID): Promise<Result<void>> {
-    if (id.length > 36) { // Mock ID 형태 체크 (임시)
-       return { data: null, error: null };
+    if (IS_MOCK_UUID(id)) {
+      console.log('[ScheduleUseCase] Mock mode: simulating delete success')
+      return { data: null, error: null }
     }
 
     const { error } = await supabaseBrowser

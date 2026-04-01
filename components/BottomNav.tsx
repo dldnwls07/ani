@@ -6,17 +6,23 @@ import { usePathname } from 'next/navigation'
 import { Sparkles, Calendar, Heart, Sun, Bookmark } from 'lucide-react'
 import { DatePlannerModal } from './DatePlannerModal'
 import { ChatBotModal } from './ChatBotModal'
+import { GlobalPlannerOverlay } from './GlobalPlannerOverlay'
+import { useDatePlannerStore } from '@/hooks/useDatePlannerStore'
 
 interface BottomNavProps {
   /** 채팅/데이트 모달을 외부에서 제어하고 싶을 때 전달 */
   onChatOpen?: () => void
   onDateOpen?: () => void
+  datePlannerProps?: {
+    initialDate?: string
+    initialSchedules?: any[]
+  }
 }
 
-export function BottomNav({ onChatOpen, onDateOpen }: BottomNavProps) {
+export function BottomNav({ onChatOpen, onDateOpen, datePlannerProps }: BottomNavProps) {
   const pathname = usePathname()
   const [isChatOpen, setIsChatOpen] = useState(false)
-  const [isDateOpen, setIsDateOpen] = useState(false)
+  const { openModal } = useDatePlannerStore()
 
   const isActive = (path: string) => pathname === path
 
@@ -32,7 +38,7 @@ export function BottomNav({ onChatOpen, onDateOpen }: BottomNavProps) {
     if (onDateOpen) {
       onDateOpen()
     } else {
-      setIsDateOpen(true)
+      openModal(datePlannerProps?.initialDate)
     }
   }
 
@@ -69,9 +75,12 @@ export function BottomNav({ onChatOpen, onDateOpen }: BottomNavProps) {
         </Link>
       </nav>
 
-      {/* 자체 모달 관리 (외부 제어가 아닌 경우) */}
+      {/* 자체 모달 관리 */}
       {!onChatOpen && <ChatBotModal isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />}
-      {!onDateOpen && <DatePlannerModal isOpen={isDateOpen} onClose={() => setIsDateOpen(false)} />}
+      
+      {/* 글로벌 데이트 플래너 오버레이 & 모달 (Store 기반) */}
+      <GlobalPlannerOverlay />
+      <DatePlannerModal />
     </>
   )
 }

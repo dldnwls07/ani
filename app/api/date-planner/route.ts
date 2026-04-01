@@ -56,22 +56,29 @@ async function callGemini(prompt: string, jsonMode = false): Promise<string> {
 // ============================================================
 // 하네스 에이전트 1: Planner (계약 수립)
 // ============================================================
-async function runPlanner(busySlots: string[], wishlistTags: string[], targetDate: string): Promise<Record<string, unknown>> {
+async function runPlanner(busySlots: {time: string, location: string}[], wishlistTags: string[], targetDate: string): Promise<Record<string, unknown>> {
+  const locationContext = busySlots.map(s => s.location).filter(Boolean).join(', ')
+  
   const prompt = `
 당신은 프리미엄 커플 데이트 서비스 '우리사이'의 Planner 에이전트입니다.
 
 [컨텍스트]
 - 데이트 날짜: ${targetDate}
-- 바쁜 시간대: ${busySlots.length > 0 ? busySlots.join(', ') : '없음 (온종일 비어있음)'}
-- 커플 관심사/위시리스트: ${wishlistTags.length > 0 ? wishlistTags.join(', ') : '특별한 선호 없음'}
+- 기존 일정 및 장소: ${busySlots.length > 0 ? busySlots.map(s => `${s.time}(${s.location || '장소미정'})`).join(', ') : '없음'}
+- 중요 지역: ${locationContext || '서울 주요 핫플레이스'}
+- 커플 관심사: ${wishlistTags.join(', ')}
 
 [임무]
-아래 JSON 형식으로 "데이트 계약서(Date Contract)"를 작성하세요.
+아래 JSON 형식으로 "데이트 계약서"를 작성하세요.
 {
-  "constraints": ["시간 제약", "지역 제약", "예산 제약"],
-  "evaluationCriteria": ["평가 기준 1", "평가 기준 2", "평가 기준 3"],
+  "constraints": [
+    "반드시 ${locationContext || '서울'} 지역 내 또는 인접 지역에서만 추천할 것",
+    "기존 일정의 장소와 동선이 꼬이지 않게 할 것",
+    "실제로 현재 영업 중인 유명 장소만 사용할 것"
+  ],
+  "evaluationCriteria": ["지역 일관성", "이동 효율성", "실존 여부"],
   "mood": "분위기 키워드",
-  "area": "추천 지역"
+  "targetArea": "${locationContext || '추천 지역'}"
 }
 
 반드시 위 JSON 형식만 반환하세요.`
@@ -87,34 +94,34 @@ async function runPlanner(busySlots: string[], wishlistTags: string[], targetDat
 // ============================================================
 async function runGenerator(contract: Record<string, unknown>, targetDate: string): Promise<Record<string, unknown>> {
   const prompt = `
-당신은 프리미엄 커플 데이트 서비스 '우리사이'의 Generator 에이전트입니다.
+당신은 데이트 코스 생성 전문가입니다.
 
 [계약서]
 ${JSON.stringify(contract, null, 2)}
 
 [임무]
-위 계약서의 제약조건과 분위기에 맞는 구체적인 데이트 코스 1개를 제안하세요.
-날짜: ${targetDate}
+계약서의 'targetArea'와 'constraints'를 **최우선**으로 준수하여 데이트 코스를 제안하세요.
+예를 들어, 일정 장소가 '여의도'라면 반드시 여의도 내 또는 도보/대중교통 15분 이내의 장소만 추천해야 합니다. 하남이나 남양주 같은 먼 곳은 절대 안 됩니다.
 
 반드시 아래 JSON 형식으로만 응답하세요:
 {
   "title": "데이트 코스 제목",
   "description": "전체 코스 설명",
-  "reason": "이 코스를 추천하는 이유",
+  "reason": "이 지역을 선택한 이유와 기존 일정과의 조화 설명",
   "items": [
     {
       "time": "HH:mm",
-      "place": "실제 한국 장소명 (구체적 지명)",
-      "recommendation": "이 장소에서의 활동 조언",
+      "place": "실제 한국 장소명 (네이버/카카오 지도 검색 가능한 정확한 명칭)",
+      "recommendation": "상세 활동 가이드",
       "category": "RESTAURANT | CAFE | EXHIBITION | WALK | TRIP | ETC"
     }
   ]
 }
 
-*규칙*
-1. 서울/경기 지역의 실제 존재하는 장소명을 사용하세요.
-2. 코스는 3~5개 아이템으로 구성하세요.
-3. 계약서의 바쁜 시간대를 반드시 피해서 배치하세요.`
+*핵심 규칙*
+1. 존재하지 않거나 폐업한 장소는 절대 금지 (2024-2025 최신 정보 기준).
+2. 기존 일정이 있는 장소와의 거리를 계산하여 현실적인 동선만 짤 것.
+3. 텍스트에 '할루시네이션'이 섞이지 않도록 주의.`
 
   const raw = await callGemini(prompt, true)
   const parsed = extractJSON(raw)
@@ -125,15 +132,9 @@ ${JSON.stringify(contract, null, 2)}
 // ============================================================
 // 하네스 에이전트 3: Evaluator (검증)
 // ============================================================
-interface EvalResult {
-  pass: boolean
-  score: number
-  critique: string
-}
-
 async function runEvaluator(proposal: Record<string, unknown>, contract: Record<string, unknown>): Promise<EvalResult> {
   const prompt = `
-당신은 프리미엄 커플 데이트 서비스 '우리사이'의 Evaluator 에이전트입니다.
+당신은 데이터 검증 전문가입니다. 제안된 데이트 코스를 엄격하게 심사하세요.
 
 [평가 대상 코스]
 ${JSON.stringify(proposal, null, 2)}
@@ -142,19 +143,16 @@ ${JSON.stringify(proposal, null, 2)}
 ${JSON.stringify(contract, null, 2)}
 
 [임무]
-위 코스가 계약서의 제약조건과 평가 기준을 충족하는지 엄격히 검증하세요.
+다음 항목을 검증하여 하나라도 위반 시 'pass': false를 반환하세요.
+1. **지역 일치성**: targetArea(${contract.targetArea})를 벗어나 엉뚱한 지역을 추천했는가? (가장 중요)
+2. **장소 실존성**: 실제로 존재하는 장소인가? (가짜 장소, 폐업 장소 체크)
+3. **시간 중복**: 기존 일정 시간대와 겹치는가?
 
-검증 항목:
-1. 장소가 현실적이고 실제로 존재할 가능성이 높은가?
-2. 시간 배치가 논리적인가? (동선, 이동 시간)
-3. 바쁜 시간대와 겹치지 않는가?
-4. 전체적인 분위기와 흐름이 자연스러운가?
-
-다음 JSON으로만 응답하세요:
+응답 JSON:
 {
-  "pass": true 또는 false,
-  "score": 0~100 사이 정수,
-  "critique": "개선이 필요한 점 (pass가 true여도 작성)"
+  "pass": true | false,
+  "score": 0~100,
+  "critique": "위반 사항이 있다면 구체적으로 지적"
 }`
 
   const raw = await callGemini(prompt, true)
@@ -167,6 +165,8 @@ ${JSON.stringify(contract, null, 2)}
     critique: String(parsed.critique || '')
   }
 }
+
+// ... (POST 함수 내 데이터 전처리 부분 수정 필요)
 
 // ============================================================
 // API Route: POST /api/date-planner
@@ -183,9 +183,13 @@ export async function POST(req: Request) {
     const { schedules, wishlists, targetDate } = await req.json()
 
     // 데이터 전처리
-    const busySlots = (schedules || []).map((s: Record<string, string>) => {
+    const busySlots = (schedules || []).map((s: Record<string, any>) => {
       const dt = new Date(s.start_datetime || s.startDatetime || '')
-      return `${dt.getHours()}:${String(dt.getMinutes()).padStart(2, '0')}`
+      const loc = s.location_data?.name || s.locationData?.name || ''
+      return {
+        time: `${dt.getHours()}:${String(dt.getMinutes()).padStart(2, '0')}`,
+        location: loc
+      }
     })
     const wishlistTags = (wishlists || []).map((w: Record<string, string>) => w.title || w.name || '').filter(Boolean)
 

@@ -1,44 +1,47 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Heart, Sparkles, MapPin, Clock, Calendar, Check, X, Loader2 } from 'lucide-react'
-import { datePlannerUseCase, DateCourse } from '@/application/schedule/usecases/DatePlannerUseCase'
+import { Heart, Sparkles, MapPin, Clock, Calendar, Check, X, Loader2, ArrowRight, ShieldCheck, Info } from 'lucide-react'
 import { scheduleUseCase } from '@/application/schedule/usecases/ScheduleUseCase'
 import { useAuthStore } from '@/hooks/useAuthStore'
 import { useCoupleStore } from '@/hooks/useCoupleStore'
+import { useDatePlannerStore } from '@/hooks/useDatePlannerStore'
+import { format } from 'date-fns'
+import { ko } from 'date-fns/locale'
 
-export function DatePlannerModal({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) {
+export function DatePlannerModal() {
   const { user } = useAuthStore()
   const { couple } = useCoupleStore()
-  const [loading, setLoading] = useState(false)
+  const { isModalOpen, closeModal, isGenerating, isVerified, result, targetDate, generate, clear } = useDatePlannerStore()
   const [saving, setSaving] = useState(false)
-  const [recommendation, setRecommendation] = useState<DateCourse | null>(null)
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
+  const [localDate, setLocalDate] = useState(targetDate || new Date().toISOString().split('T')[0])
+
+  useEffect(() => {
+    if (isModalOpen && targetDate) {
+      setLocalDate(targetDate)
+    }
+  }, [isModalOpen, targetDate])
 
   const handleGenerate = async () => {
-    if (!couple) return
-    setLoading(true)
-    const { data, error } = await datePlannerUseCase.getAIRecommendation(couple.id, selectedDate)
-    if (!error && data) {
-      setRecommendation(data)
-    }
-    setLoading(false)
+    if (!couple || !localDate) return
+    // 분석 시작 시 전역 스토어에 위임하고 모달을 바로 닫아 백그라운드 작업 시작
+    generate(couple.id, localDate)
+    closeModal()
   }
 
   const handleAddSchedules = async () => {
-    if (!recommendation || !user || !couple) return
+    if (!result || !user || !couple) return
     setSaving(true)
     
     try {
-      // AI 추천 코스의 각 아이템을 실제 일정으로 등록
-      for (const item of recommendation.items) {
+      for (const item of result.items) {
         const [hours, minutes] = item.time.split(':').map(Number)
-        const startDate = new Date(selectedDate)
+        const startDate = new Date(localDate)
         startDate.setHours(hours, minutes, 0, 0)
         
         const endDate = new Date(startDate)
-        endDate.setHours(endDate.getHours() + 1) // 기본 1시간 단위
+        endDate.setHours(endDate.getHours() + 1)
 
         await scheduleUseCase.createSchedule({
           coupleId: couple.id,
@@ -52,138 +55,172 @@ export function DatePlannerModal({ isOpen, onClose }: { isOpen: boolean, onClose
           locationData: { name: item.place }
         })
       }
+      alert('모든 일정이 캘린더에 등록되었습니다! 💕')
+      clear() // 스토어 초기화
+      closeModal()
+      
+      // 약간의 지연 후 페이지 리로드로 캘린더 갱신 트리거 (간단한 동기화)
+      setTimeout(() => {
+        window.dispatchEvent(new Event('schedule-updated'))
+      }, 500)
     } catch (e) {
       console.error('[DatePlanner] Failed to save schedules:', e)
+    } finally {
+      setSaving(false)
     }
-    
-    setSaving(false)
-    onClose()
   }
 
   return (
     <AnimatePresence>
-      {isOpen && (
+      {isModalOpen && (
         <>
           <motion.div 
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[200]" 
-            onClick={onClose} 
+            className="fixed inset-0 bg-black/60 backdrop-blur-md z-[200]" 
+            onClick={closeModal} 
           />
           <motion.div 
             initial={{ y: "100%" }} animate={{ y: "0%" }} exit={{ y: "100%" }}
-            transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[3rem] p-8 pb-12 z-[201] shadow-2xl overflow-y-auto max-h-[90vh]"
+            transition={{ type: "spring", damping: 30, stiffness: 300 }}
+            className="fixed inset-x-0 bottom-0 top-10 md:top-20 max-w-2xl mx-auto bg-gray-50 rounded-t-[3rem] shadow-2xl flex flex-col z-[201] overflow-hidden"
           >
-            {/* 핸들 바 */}
-            <div className="w-12 h-1.5 bg-gray-100 rounded-full mx-auto mb-6" />
-
-            <div className="flex justify-between items-start mb-6">
-              <div>
-                <h2 className="text-2xl font-black text-gray-800 flex items-center gap-2">
-                  AI 데이트 큐레이션 <Sparkles className="w-6 h-6 text-yellow-400 fill-yellow-200" />
-                </h2>
-                <p className="text-sm text-gray-400 font-medium">우리의 일정을 분석해 데이트를 짜드릴게요!</p>
-              </div>
-              <button onClick={onClose} className="p-2 bg-gray-50 rounded-full text-gray-400">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {!recommendation && !loading && (
-              <div className="space-y-6">
-                <div className="bg-rose-50 p-6 rounded-3xl border border-rose-100">
-                  <label className="text-xs font-bold text-rose-400 uppercase tracking-widest block mb-4">날짜 선택</label>
-                  <div className="flex items-center space-x-3 bg-white p-4 rounded-2xl shadow-sm border border-rose-100/50">
-                    <Calendar className="w-5 h-5 text-rose-500" />
-                    <input 
-                      type="date" 
-                      value={selectedDate} 
-                      onChange={(e) => setSelectedDate(e.target.value)}
-                      className="flex-1 bg-transparent text-gray-700 font-bold focus:outline-none"
-                    />
-                  </div>
+            {/* 상단 헤더 영역 */}
+            <div className="bg-white px-8 pt-8 pb-6 shrink-0 border-b border-gray-100">
+              <div className="w-12 h-1.5 bg-gray-100 rounded-full mx-auto mb-6 md:hidden" />
+              <div className="flex justify-between items-start">
+                <div>
+                  <h2 className="text-2xl font-black text-gray-800 flex items-center gap-2">
+                    AI 코스 조율사 <Sparkles className="w-6 h-6 text-rose-400 fill-rose-100" />
+                  </h2>
+                  <p className="text-sm text-gray-400 font-bold mt-1">
+                    {format(new Date(localDate), 'M월 d일 (EEEE)', { locale: ko })} 데이트
+                  </p>
                 </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  {['무드 있는', '활동적인', '차분한', '색다른'].map(tag => (
-                    <div key={tag} className="p-4 bg-gray-50 border border-gray-100 rounded-2xl flex items-center space-x-2 text-gray-500">
-                      <Check className="w-4 h-4" />
-                      <span className="text-sm font-semibold">{tag} 데이트</span>
-                    </div>
-                  ))}
-                </div>
-
-                <button 
-                  onClick={handleGenerate}
-                  className="w-full py-4 bg-gradient-to-r from-rose-400 to-pink-500 text-white font-black text-lg rounded-3xl shadow-lg shadow-rose-200 hover:scale-[1.02] active:scale-[98%] transition-all"
-                >
-                  AI 코스 조율하기 ✨
+                <button onClick={closeModal} className="p-3 bg-gray-50 rounded-2xl text-gray-400 hover:text-gray-600 transition-colors">
+                  <X className="w-6 h-6" />
                 </button>
               </div>
-            )}
+            </div>
 
-            {loading && (
-              <div className="py-20 flex flex-col items-center justify-center space-y-4">
-                <motion.div 
-                  animate={{ rotate: 360, scale: [1, 1.2, 1] }} 
-                  transition={{ repeat: Infinity, duration: 2 }} 
-                  className="w-20 h-20 bg-rose-50 rounded-full flex items-center justify-center"
-                >
-                  <Sparkles className="w-10 h-10 text-rose-500" />
-                </motion.div>
-                <p className="text-gray-400 font-bold animate-pulse italic">최적의 코스를 조합하고 있습니다...</p>
-              </div>
-            )}
+            {/* 메인 콘텐츠 영역 (스크롤 가능) */}
+            <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-8 overscroll-contain">
+              {!result && !isGenerating && (
+                <div className="max-w-md mx-auto space-y-8 py-4">
+                  <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
+                    <label className="text-[10px] font-black text-rose-400 uppercase tracking-[0.2em] block mb-4 px-1">날짜 확인</label>
+                    <div className="flex items-center space-x-4 bg-gray-50 p-5 rounded-3xl border border-gray-100/50">
+                      <Calendar className="w-6 h-6 text-rose-500" />
+                      <input 
+                        type="date" 
+                        value={localDate} 
+                        onChange={(e) => setLocalDate(e.target.value)}
+                        className="flex-1 bg-transparent text-lg text-gray-800 font-black focus:outline-none"
+                      />
+                    </div>
+                  </div>
 
-            {recommendation && !loading && (
-              <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="space-y-6">
-                <div className="text-center p-2">
-                  <h3 className="text-xl font-extrabold text-gray-800">{recommendation.title}</h3>
-                  <p className="text-sm text-rose-400 mt-1">{recommendation.reason}</p>
-                </div>
-
-                <div className="space-y-1 relative">
-                  <div className="absolute left-[27px] top-6 bottom-6 w-0.5 bg-rose-100" />
-                  {recommendation.items.map((item, idx) => (
-                    <motion.div 
-                      key={idx} 
-                      initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * 0.1 }}
-                      className="flex items-start space-x-4 p-4 relative"
-                    >
-                      <div className="w-7 h-7 bg-white border-2 border-rose-400 rounded-full flex items-center justify-center text-[10px] font-black text-rose-500 shadow-sm z-10 shrink-0 mt-1">
-                        {idx + 1}
-                      </div>
-                      <div className="bg-gray-50/50 p-4 rounded-3xl flex-1 border border-gray-100 hover:bg-rose-50/30 transition-colors">
-                        <div className="flex justify-between items-center mb-1">
-                          <span className="text-xs font-black text-rose-400 flex items-center gap-1">
-                            <Clock className="w-3 h-3" /> {item.time}
-                          </span>
-                          <span className="px-2 py-0.5 bg-white border border-gray-100 text-[10px] font-bold text-gray-400 rounded-full uppercase italic tracking-tighter shadow-sm">{item.category}</span>
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 px-2">
+                      <Info className="w-4 h-4 text-rose-400" />
+                      <p className="text-xs font-bold text-gray-400">우리의 일정과 위시리스트를 바탕으로 장소를 추천해요.</p>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-3">
+                      {['무드 있는', '활동적인', '차분한', '색다른'].map(tag => (
+                        <div key={tag} className="p-5 bg-white border border-gray-100 rounded-[2rem] flex items-center justify-center space-x-2 text-gray-600 shadow-sm hover:border-rose-200 transition-all cursor-default">
+                          <Check className="w-4 h-4 text-rose-400" />
+                          <span className="text-sm font-black">{tag}</span>
                         </div>
-                        <h4 className="font-bold text-gray-800 flex items-center gap-1 tracking-tight">
-                          <MapPin className="w-3.5 h-3.5 text-gray-400" /> {item.place}
-                        </h4>
-                        <p className="text-xs text-gray-500 mt-1.5 leading-relaxed font-medium">"{item.recommendation}"</p>
-                      </div>
-                    </motion.div>
-                  ))}
-                </div>
+                      ))}
+                    </div>
+                  </div>
 
-                <div className="grid grid-cols-2 gap-3 mt-4">
-                  <button onClick={() => setRecommendation(null)} className="py-4 bg-gray-50 text-gray-500 font-bold rounded-2xl hover:bg-gray-100 transition shadow-sm">다시 추천받기</button>
                   <button 
-                    onClick={handleAddSchedules} 
-                    disabled={saving}
-                    className="py-4 bg-rose-500 text-white font-bold rounded-2xl flex items-center justify-center gap-2 hover:bg-rose-600 transition shadow-lg shadow-rose-200 disabled:opacity-60"
+                    onClick={handleGenerate}
+                    className="w-full py-6 bg-rose-500 text-white font-black text-xl rounded-[2rem] shadow-xl shadow-rose-200 hover:bg-rose-600 active:scale-[0.98] transition-all flex items-center justify-center gap-3"
                   >
-                    {saving ? (
-                      <><Loader2 className="w-4 h-4 animate-spin" /> 등록 중...</>
-                    ) : (
-                      <><Heart className="w-4 h-4 fill-white" /> 전체 일정 등록</>
-                    )}
+                    백그라운드에서 조율 시작하기 <ArrowRight className="w-6 h-6" />
                   </button>
                 </div>
-              </motion.div>
+              )}
+
+              {/* 결과 화면 */}
+              {result && (
+                <div className="max-w-2xl mx-auto space-y-8 pb-32">
+                  <div className="bg-white p-8 rounded-[3rem] shadow-sm border border-gray-100 relative overflow-hidden">
+                    {isVerified && (
+                      <div className="absolute top-0 right-0 bg-green-500 px-6 py-2 rounded-bl-3xl flex items-center gap-2">
+                        <ShieldCheck className="w-4 h-4 text-white" />
+                        <span className="text-[10px] font-black text-white uppercase tracking-wider">Harness Verified</span>
+                      </div>
+                    )}
+                    <div className="text-center space-y-3 mt-4">
+                      <h3 className="text-2xl font-black text-gray-800 leading-tight">{result.title}</h3>
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="h-[1px] w-8 bg-rose-200" />
+                        <p className="text-sm font-bold text-rose-500">{result.reason}</p>
+                        <div className="h-[1px] w-8 bg-rose-200" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    {result.items.map((item, idx) => (
+                      <motion.div 
+                        key={idx} 
+                        initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.1 }}
+                        className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm flex items-start gap-5 group hover:border-rose-200 transition-all"
+                      >
+                        <div className="flex flex-col items-center gap-2 shrink-0">
+                          <div className="w-12 h-12 bg-rose-50 rounded-2xl flex items-center justify-center text-rose-500 font-black text-xs">
+                            {item.time}
+                          </div>
+                          {idx < result.items.length - 1 && (
+                            <div className="w-0.5 h-12 bg-gray-50 rounded-full" />
+                          )}
+                        </div>
+                        
+                        <div className="flex-1 min-w-0 pt-1">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="px-3 py-1 bg-gray-50 text-[10px] font-black text-gray-400 rounded-full uppercase tracking-wider">
+                              {item.category}
+                            </span>
+                          </div>
+                          <h4 className="text-lg font-black text-gray-800 flex items-center gap-2 truncate">
+                            {item.place}
+                          </h4>
+                          <p className="text-sm font-bold text-gray-500 mt-2 leading-relaxed">
+                            {item.recommendation}
+                          </p>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 하단 고정 버튼 영역 */}
+            {result && (
+              <div className="bg-white p-8 pt-6 border-t border-gray-100 shrink-0 flex gap-4">
+                <button 
+                  onClick={() => clear()} 
+                  className="flex-1 py-5 bg-gray-50 text-gray-500 font-black rounded-[2rem] hover:bg-gray-100 transition-all active:scale-[0.98]"
+                >
+                  초기화
+                </button>
+                <button 
+                  onClick={handleAddSchedules} 
+                  disabled={saving}
+                  className="flex-[2] py-5 bg-rose-500 text-white font-black rounded-[2rem] flex items-center justify-center gap-3 shadow-xl shadow-rose-200 hover:bg-rose-600 transition-all disabled:opacity-60 active:scale-[0.98]"
+                >
+                  {saving ? (
+                    <><Loader2 className="w-5 h-5 animate-spin" /> 저장 중...</>
+                  ) : (
+                    <><Heart className="w-5 h-5 fill-white" /> 일정에 모두 추가</>
+                  )}
+                </button>
+              </div>
             )}
           </motion.div>
         </>

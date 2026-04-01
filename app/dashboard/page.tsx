@@ -57,6 +57,14 @@ export default function DashboardPage() {
   const updateMyStatus = async (message: string) => {
     if (!user) return
     setUpdateStatusLoading(true)
+    
+    // Mock mode graceful fallback
+    if (user.id.startsWith('00000000-0000-0000-0000-000000000')) {
+      setUser({ ...user, statusMessage: message, statusUpdatedAt: new Date().toISOString() })
+      setUpdateStatusLoading(false)
+      return
+    }
+
     const { error } = await supabaseBrowser
       .from('profiles')
       .update({ status_message: message, status_updated_at: new Date().toISOString() })
@@ -64,6 +72,8 @@ export default function DashboardPage() {
 
     if (!error) {
       setUser({ ...user, statusMessage: message, statusUpdatedAt: new Date().toISOString() })
+    } else {
+      console.error("Status update error:", error)
     }
     setUpdateStatusLoading(false)
   }
@@ -262,8 +272,32 @@ export default function DashboardPage() {
         </div>
       </section>
 
+      {/* 퀵 메뉴 (캘린더 / 버킷리스트) */}
+      <section className="grid grid-cols-2 gap-4 pb-6">
+        <Link href="/calendar" className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col items-center justify-center space-y-3 hover:border-rose-200 transition-all hover:shadow-md active:scale-[0.98]">
+          <div className="w-14 h-14 bg-rose-50 rounded-2xl flex items-center justify-center">
+            <Calendar className="w-7 h-7 text-rose-500" />
+          </div>
+          <div className="text-center">
+            <span className="block text-sm font-black text-gray-800 tracking-tight">우리의 캘린더</span>
+            <span className="block text-[10px] font-bold text-gray-400 mt-0.5">일정 관리하기</span>
+          </div>
+        </Link>
+        
+        <Link href="/wishlist" className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col items-center justify-center space-y-3 hover:border-rose-200 transition-all hover:shadow-md active:scale-[0.98]">
+          <div className="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center">
+            <Bookmark className="w-7 h-7 text-indigo-500" />
+          </div>
+          <div className="text-center">
+            <span className="block text-sm font-black text-gray-800 tracking-tight">버킷리스트</span>
+            <span className="block text-[10px] font-bold text-gray-400 mt-0.5">함께하고 싶은 것</span>
+          </div>
+        </Link>
+      </section>
+
       {/* 공통 하단 네비게이션 (채팅/데이트 모달 내장) */}
       <BottomNav />
+
 
       {/* 하트 발송 시각 효과 */}
       <AnimatePresence>

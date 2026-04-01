@@ -40,6 +40,17 @@ export class WishlistUseCase {
 
   // 위시 생성
   async createWish(wish: Omit<WishItem, 'id' | 'createdAt' | 'agreedBy'>): Promise<Result<WishItem>> {
+    if (IS_MOCK_UUID(wish.coupleId as string)) {
+      console.log('[WishlistUseCase] Mock mode: skipping create');
+      const mockItem: WishItem = {
+        id: crypto.randomUUID() as UUID,
+        ...wish,
+        agreedBy: [],
+        createdAt: new Date().toISOString()
+      };
+      return { data: mockItem, error: null };
+    }
+
     const { data, error } = await supabaseBrowser
       .from('wishlists')
       .insert({
@@ -66,6 +77,11 @@ export class WishlistUseCase {
       newAgreed = [...currentAgreed, userId]
     }
 
+    if (IS_MOCK_UUID(userId as string)) {
+      console.log('[WishlistUseCase] Mock mode: skipping toggle agree');
+      return { data: newAgreed, error: null };
+    }
+
     const { error } = await supabaseBrowser
       .from('wishlists')
       .update({ agreed_by: newAgreed })
@@ -77,6 +93,11 @@ export class WishlistUseCase {
 
   // 위시 삭제
   async deleteWish(id: UUID): Promise<Result<void>> {
+    if (IS_MOCK_UUID(id as string)) {
+       console.log('[WishlistUseCase] Mock mode: skipping delete');
+       return { data: null, error: null };
+    }
+
     const { error } = await supabaseBrowser
       .from('wishlists')
       .delete()

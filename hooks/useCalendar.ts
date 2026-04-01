@@ -14,6 +14,11 @@ export function useCalendar() {
 
   const nextMonth = () => setCurrentMonth(addMonths(currentMonth, 1))
   const prevMonth = () => setCurrentMonth(subMonths(currentMonth, 1))
+  const goToToday = () => {
+    const today = new Date()
+    setCurrentMonth(today)
+    setSelectedDate(today)
+  }
 
   return {
     currentMonth,
@@ -22,6 +27,7 @@ export function useCalendar() {
     setSelectedDate,
     nextMonth,
     prevMonth,
+    goToToday,
     formatTitle: () => format(currentMonth, 'yyyy년 M월', { locale: ko }),
     isToday: (date: Date) => isSameDay(date, new Date()),
     isSameMonth: (date: Date) => isSameMonth(date, currentMonth),
