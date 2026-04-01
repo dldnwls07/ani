@@ -1,44 +1,58 @@
----
-trigger: always_on
----
-
 # Global Technical Standards & Conventions
+> 이 파일은 `.agents/rules/` 에 위치하며 Antigravity가 항상 참조한다.
+> (`trigger: always_on` 문법은 Antigravity에서 미지원 — GEMINI.md로 대체됨)
 
-## 1. General Principles
-- **Response Language**: All interactions with the user must be in **Korean**.
-- **Documentation**: All project documents (`PLAN.md`, `TODO.md`, etc.) must be written in **Korean**.
-- **Context Management**: Always read `GEMINI.md`, `PLAN.md`, and `TODO.md` before starting any task.
+---
 
-## 2. Frontend Standards (Next.js & Tailwind)
-- **Framework**: Use **Next.js (App Router)**.
-- **Styling**: Use **Tailwind CSS** utility classes only. No inline styles.
-- **Components**: Use **Lucide-react** for icons and follow the **Atomic Design** pattern.
-- **Naming**: Use **PascalCase** for component files and **camelCase** for functions.
+## 1. 공통 원칙
+- **응답 언어**: 사용자와의 모든 대화는 **한국어**로 한다.
+- **문서**: `PLAN.md`, `TODO.md` 등 모든 프로젝트 문서는 **한국어**로 작성한다.
+- **시작 전 확인**: 모든 태스크 시작 전 `GEMINI.md` → `PLAN.md` → `TODO.md` 순서로 읽는다.
+- **모르면 멈춘다**: 불확실한 경우 추측으로 진행하지 말고 솔직하게 말하고 멈춘다.
 
-## 3. Backend & Integration Standards (Supabase & Zapier)
-- **Database**: Use **Supabase** for DB and Auth.
-- **Security**: Implement **Row Level Security (RLS)** for every table.
-- **API**: Centralize Supabase logic in `@/lib/supabaseClient.ts`.
-- **Automation**: Use **Zapier** or **MCP** for external service triggers (Instagram, Gmail, etc.).
-- **Secrets**: Never hard-code API keys. Use `.env.local` variables.
+---
 
-## 4. Coding & Quality Standards
-- **Language**: **TypeScript** is mandatory. No `any` types allowed.
-- **Structure**: Follow a clean directory structure:
-  - `/app`: Pages and Layouts
-  - `/components`: UI Components
-  - `/lib`: Utility functions and clients
-  - `/hooks`: Custom React hooks
-- **Verification**: Every feature must be checked by [@qa-tester] before moving to [@ops-manager].
+## 2. Frontend 표준 (Next.js & Tailwind)
+- **Framework**: Next.js App Router (Pages Router 사용 금지)
+- **Styling**: Tailwind CSS 유틸리티 클래스만 사용. 인라인 스타일 절대 금지.
+- **Icons**: Lucide-react
+- **Pattern**: Atomic Design
+- **Naming**: 컴포넌트 `PascalCase`, 함수 `camelCase`
 
-## 5. Collaboration (Handoff)
-- When a task is finished, update `TODO.md` and explicitly mention the next agent (e.g., "@ux-designer, please proceed with UI design based on the plan").
+---
 
-## 6. Business Strategy Standards
-- **Analysis Frameworks**: Always apply **SWOT Analysis** (Strengths, Weaknesses, Opportunities, Threats) and a **Competitor 
-- **Competitor Identification**: Must identify at least 3 direct/indirect competitors using real-time search.
-- **Pain Point Analysis**: Must identify what current users are complaining about in competitor services.Matrix** (comparing at least 3 rivals).
-- **Target Audience**: Clearly define the Primary and Secondary user personas.
-- **Monetization**: Propose at least two revenue streams (e.g., Freemium, Subscription, or API-based billing).
-- **Feasibility Score**: Provide a final "Go/No-Go" recommendation based on market saturation and technical effort.
-- **Language**: All strategic reports must be delivered in **Korean** for the user's review.
+## 3. Backend & Integration 표준 (Supabase & Zapier)
+- **DB & Auth**: Supabase
+- **보안**: 모든 테이블에 RLS 적용 필수
+- **API**: Supabase 로직은 `@/lib/supabaseClient.ts` 에 집중
+- **자동화**: 외부 서비스 연동은 Zapier 또는 MCP
+- **비밀키**: 절대 하드코딩 금지. `.env.local` 사용.
+
+---
+
+## 4. 코드 품질 표준
+- **TypeScript 필수**: `any` 타입 사용 금지
+- **디렉토리 구조**:
+  - `/app` — Pages & Layouts
+  - `/components` — UI (Atomic Design)
+  - `/lib` — Utils & Clients
+  - `/hooks` — Custom React Hooks
+- **검증**: 모든 기능은 `@qa-tester` 검토 후 `@ops-manager` 에게 넘긴다.
+
+---
+
+## 5. 핸드오프 규칙
+- 태스크 완료 시 반드시 `TODO.md` 업데이트 후 다음 담당자를 명시한다.
+- 예시: `"@ux-designer, 플랜 기반으로 UI 설계를 시작해주세요."`
+
+---
+
+## 6. 비즈니스 전략 표준 (신규 프로젝트 한정)
+- **분석 프레임워크**: SWOT 분석 + 경쟁사 매트릭스 (최소 3개 경쟁사)
+- **고객 분석**: Primary/Secondary 페르소나 명확히 정의
+- **수익화**: 최소 2개 수익 모델 제안 (Freemium, Subscription, API 과금 등)
+- **결론**: 시장 포화도 + 기술 난이도 기반 Go/No-Go 판정
+- **언어**: 전략 보고서는 한국어로 작성
+
+> ⚠️ 이 섹션은 신규 프로젝트 시작 시에만 적용된다.
+> 버그 픽스, 리팩토링, 소규모 수정에는 적용하지 않는다.
