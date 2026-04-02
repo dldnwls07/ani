@@ -3,32 +3,129 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronLeft, ChevronRight, Plus, MapPin, Clock, Heart, Sparkles, X, Trash2, CalendarDays, Sun, Bot, Edit2 } from 'lucide-react'
-import { format, differenceInDays, addDays, isSameDay } from 'date-fns'
+import { format, addDays, isSameDay, parseISO } from 'date-fns'
 import { ko } from 'date-fns/locale'
 import { useCalendar } from '@/hooks/useCalendar'
 import { useAuthStore } from '@/hooks/useAuthStore'
 import { useCoupleStore } from '@/hooks/useCoupleStore'
 import { scheduleUseCase } from '@/application/schedule/usecases/ScheduleUseCase'
 import { BottomNav } from '@/components/BottomNav'
-import { DatePlannerModal } from '@/components/DatePlannerModal'
+import { useDatePlannerStore } from '@/hooks/useDatePlannerStore'
 import Link from 'next/link'
 
 import { Schedule } from '@/domain/schedule/entities/Schedule'
 
 // 시간 옵션 생성 (00:00 ~ 23:30, 30분 단위)
-...
+const TIME_OPTIONS: string[] = []
+for (let h = 0; h < 24; h++) {
+  for (let m = 0; m < 60; m += 30) {
+    TIME_OPTIONS.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`)
+  }
+}
+
+// 현재 시각 기준으로 가장 가까운 다음 30분 단위 시간 반환
+function getNextHalfHour(): string {
+  const now = new Date()
+  let h = now.getHours()
+  let m = now.getMinutes()
+  if (m < 30) {
+    m = 30
+  } else {
+    m = 0
+    h = (h + 1) % 24
+  }
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
+
+// 주어진 시간 문자열에서 1시간 뒤 시간 반환
+function addOneHour(time: string): string {
+  const [h, m] = time.split(':').map(Number)
+  const newH = (h + 1) % 24
+  return `${String(newH).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
+
 export default function CalendarPage() {
-  const { currentMonth, selectedDate, calendarDays, setSelectedDate, nextMonth, prevMonth, goToToday, formatTitle, isToday, isSameMonth, isSelected } = useCalendar()
+  const { currentMonth, selectedDate, calendarDays, setSelectedDate, nextMonth, prevMonth, formatTitle, isToday, isSameMonth, isSelected } = useCalendar()
   const { user } = useAuthStore()
   const { couple } = useCoupleStore()
+  const { openModal: openDatePlanner } = useDatePlannerStore()
+  
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [isEditOpen, setIsEditOpen] = useState(false)
-  const [isDatePlannerOpen, setIsDatePlannerOpen] = useState(false)
   const [editingSchedule, setEditingSchedule] = useState<Schedule | null>(null)
   const [schedules, setSchedules] = useState<Schedule[]>([])
   const [loading, setLoading] = useState(false)
-...
-  // 수정 모달 열기
+
+  // 일정 추가/수정 폼 상태
+  const [newTitle, setNewTitle] = useState('')
+  const [newLocation, setNewLocation] = useState('')
+  const [isAllDay, setIsAllDay] = useState(false)
+  const [startTime, setStartTime] = useState(() => getNextHalfHour())
+  const [endTime, setEndTime] = useState(() => addOneHour(getNextHalfHour()))
+
+  // 기념일 계산 (커플 연결일 기준)
+  const anniversaries = useMemo(() => {
+    if (!couple?.connectionDate) return []
+    const start = parseISO(couple.connectionDate)
+    const items = []
+    
+    // 100일 단위 (100~1000일)
+    for (let i = 1; i <= 10; i++) {
+      const days = i * 100
+      items.push({
+        date: addDays(start, days - 1),
+        title: `${days}일`
+      })
+    }
+    
+    // 1주년 단위 (1~10주년)
+    for (let i = 1; i <= 10; i++) {
+      const date = new Date(start)
+      date.setFullYear(start.getFullYear() + i)
+      items.push({
+        date,
+        title: `${i}주년`
+      })
+    }
+    
+    return items
+  }, [couple?.connectionDate])
+
+  const fetchSchedules = async () => {
+    if (!couple) return
+    setLoading(true)
+    const year = currentMonth.getFullYear()
+    const month = currentMonth.getMonth() + 1
+    const { data, error } = await scheduleUseCase.getMonthlySchedules(couple.id, year, month)
+    if (!error && data) {
+      setSchedules(data)
+    }
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    fetchSchedules()
+  }, [currentMonth, couple])
+
+  // 전역 이벤트를 통한 일정 갱신 감지 (DatePlanner 등에서 발생)
+  useEffect(() => {
+    const handleUpdate = () => fetchSchedules()
+    window.addEventListener('schedule-updated', handleUpdate)
+    return () => window.removeEventListener('schedule-updated', handleUpdate)
+  }, [])
+
+  const openAddModal = useCallback(() => {
+    setNewTitle('')
+    setNewLocation('')
+    setIsAllDay(false)
+    const next = getNextHalfHour()
+    setStartTime(next)
+    setEndTime(addOneHour(next))
+    setEditingSchedule(null)
+    setIsEditOpen(false)
+    setIsAddOpen(true)
+  }, [])
+
   const openEditModal = useCallback((schedule: Schedule) => {
     setEditingSchedule(schedule)
     setNewTitle(schedule.title)
@@ -40,10 +137,68 @@ export default function CalendarPage() {
     setStartTime(format(start, 'HH:mm'))
     setEndTime(format(end, 'HH:mm'))
     
+    setIsAddOpen(false)
     setIsEditOpen(true)
   }, [])
-...
-  // 3. 일정 삭제
+
+  const handleSaveSchedule = async () => {
+    if (!newTitle.trim() || !user || !couple) return
+
+    let startDatetime: string
+    let endDatetime: string
+
+    if (isAllDay) {
+      const dayStart = new Date(selectedDate)
+      dayStart.setHours(0, 0, 0, 0)
+      const dayEnd = new Date(selectedDate)
+      dayEnd.setHours(23, 59, 59, 999)
+      startDatetime = dayStart.toISOString()
+      endDatetime = dayEnd.toISOString()
+    } else {
+      const [sh, sm] = startTime.split(':').map(Number)
+      const [eh, em] = endTime.split(':').map(Number)
+      const start = new Date(selectedDate)
+      start.setHours(sh, sm, 0, 0)
+      const end = new Date(selectedDate)
+      end.setHours(eh, em, 0, 0)
+      if (end <= start) {
+        end.setDate(end.getDate() + 1)
+      }
+      startDatetime = start.toISOString()
+      endDatetime = end.toISOString()
+    }
+
+    if (isEditOpen && editingSchedule) {
+      const { data, error } = await scheduleUseCase.updateSchedule(editingSchedule.id, {
+        title: newTitle,
+        startDatetime,
+        endDatetime,
+        isAllDay,
+        locationData: newLocation.trim() ? { name: newLocation.trim() } : undefined
+      })
+      if (!error && data) {
+        setSchedules(prev => prev.map(s => s.id === data.id ? data : s))
+        setIsEditOpen(false)
+      }
+    } else {
+      const { data, error } = await scheduleUseCase.createSchedule({
+        coupleId: couple.id,
+        creatorId: user.id,
+        title: newTitle,
+        description: '',
+        startDatetime,
+        endDatetime,
+        isAllDay,
+        scheduleType: 'SHARED',
+        locationData: newLocation.trim() ? { name: newLocation.trim() } : undefined
+      })
+      if (!error && data) {
+        setSchedules(prev => [...prev, data])
+        setIsAddOpen(false)
+      }
+    }
+  }
+
   const handleDeleteSchedule = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
     if (!window.confirm('일정을 삭제하시겠습니까?')) return
@@ -60,14 +215,99 @@ export default function CalendarPage() {
   ) : []
 
   const selectedAnniversary = anniversaries.find(a => isSameDay(a.date, selectedDate))
-...
+
+  return (
+    <div className="flex flex-col h-screen bg-white overflow-hidden pb-24">
+      {/* 헤더 */}
+      <header className="p-6 pt-10 flex justify-between items-center bg-white shrink-0 shadow-sm border-b border-gray-50/50">
+        <Link href="/dashboard" className="p-2 -ml-2 text-gray-400 hover:text-rose-400 transition-colors">
+          <ChevronLeft className="w-6 h-6" />
+        </Link>
+        <div className="flex items-center space-x-1">
+          <h1 className="text-xl font-black text-gray-800 tracking-tight">{formatTitle()}</h1>
+        </div>
+        <div className="flex space-x-1">
+          <button onClick={prevMonth} className="p-2 bg-gray-50 rounded-full text-gray-400"><ChevronLeft className="w-4 h-4" /></button>
+          <button onClick={nextMonth} className="p-2 bg-gray-50 rounded-full text-gray-400"><ChevronRight className="w-4 h-4" /></button>
+        </div>
+      </header>
+
+      {/* 요일 라벨 */}
+      <div className="grid grid-cols-7 px-4 py-4 text-center text-[10px] font-black tracking-widest text-gray-400 uppercase shrink-0">
+        {['일', '월', '화', '수', '목', '금', '토'].map(d => <div key={d}>{d}</div>)}
+      </div>
+
       {/* 캘린더 그리드 */}
       <div className="grid grid-cols-7 px-4 gap-y-2 pb-4 shrink-0">
         {calendarDays.map((day, idx) => {
           const dayStr = format(day, 'yyyy-MM-dd')
           const hasSchedule = schedules.some(s => format(new Date(s.startDatetime), 'yyyy-MM-dd') === dayStr)
           const anniversary = anniversaries.find(a => isSameDay(a.date, day))
-...
+          const isCurrentMonth = isSameMonth(day)
+          const selected = isSelected(day)
+          const today = isToday(day)
+
+          return (
+            <motion.div 
+              key={idx}
+              whileTap={{ scale: 0.9 }}
+              onClick={() => setSelectedDate(day)}
+              className="relative aspect-square flex flex-col items-center justify-center cursor-pointer"
+            >
+              {selected && (
+                <motion.div layoutId="day-glow" className="absolute inset-1.5 bg-rose-50 border border-rose-100 rounded-2xl z-0 shadow-sm shadow-rose-100" />
+              )}
+              
+              <span className={`relative z-10 text-sm font-bold ${
+                !isCurrentMonth ? 'text-gray-200' :
+                today ? 'text-rose-500' : 
+                selected ? 'text-rose-600' :
+                'text-gray-600'
+              }`}>
+                {format(day, 'd')}
+              </span>
+
+              <div className="absolute bottom-1.5 flex gap-0.5">
+                {anniversary && (
+                  <div className="w-1 h-1 bg-amber-400 rounded-full" />
+                )}
+                {hasSchedule && (
+                  <div className={`w-1 h-1 rounded-full ${selected ? 'bg-rose-400' : 'bg-gray-300'}`} />
+                )}
+              </div>
+              
+              {today && !selected && (
+                <div className="absolute top-2.5 w-4 h-0.5 bg-rose-300/40 rounded-full" />
+              )}
+            </motion.div>
+          )
+        })}
+      </div>
+
+      {/* 선택된 날짜 상세 & 일정 - 독립 스크롤 영역 */}
+      <div className="flex-1 bg-gray-50/50 rounded-t-[3rem] border-t border-white shadow-2xl overflow-y-auto overscroll-contain">
+        <div className="p-8 space-y-6 pb-48">
+          <div className="flex justify-between items-center px-2">
+            <div className="flex flex-col">
+              <div className="flex items-center space-x-2">
+                <span className="text-2xl font-black text-gray-800">{format(selectedDate, 'd')}일</span>
+                <span className="text-sm font-bold text-gray-400">{format(selectedDate, 'EEEE', { locale: ko })}</span>
+              </div>
+              {selectedAnniversary && (
+                <div className="flex items-center gap-1 mt-1">
+                  <Sparkles className="w-3 h-3 text-amber-500 fill-amber-200" />
+                  <span className="text-xs font-black text-amber-600">{selectedAnniversary.title}</span>
+                </div>
+              )}
+            </div>
+            <button 
+              onClick={openAddModal}
+              className="w-10 h-10 bg-rose-500 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-rose-200 active:scale-90 transition-transform"
+            >
+              <Plus className="w-6 h-6" />
+            </button>
+          </div>
+
           {/* 일정 리스트 */}
           <div className="space-y-3">
             {selectedSchedules.length > 0 ? (
@@ -143,11 +383,11 @@ export default function CalendarPage() {
             )}
           </div>
 
-          {/* AI 데이트 추천 섹션 - 통합 모달로 연결 */}
+          {/* AI 데이트 추천 섹션 */}
           {selectedSchedules.length > 0 && (
             <div className="pt-4 border-t border-gray-100">
               <button
-                onClick={() => setIsDatePlannerOpen(true)}
+                onClick={() => openDatePlanner(format(selectedDate, 'yyyy-MM-dd'))}
                 className="w-full py-5 bg-gradient-to-br from-indigo-600 via-purple-600 to-rose-50 rounded-[2rem] flex items-center justify-center space-x-3 text-white shadow-xl shadow-purple-100 active:scale-[0.98] transition-all group"
               >
                 <div className="w-8 h-8 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
@@ -163,16 +403,7 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      <DatePlannerModal 
-        isOpen={isDatePlannerOpen}
-        onClose={() => {
-          setIsDatePlannerOpen(false)
-          fetchSchedules()
-        }}
-        initialDate={format(selectedDate, 'yyyy-MM-dd')}
-      />
-
-      {/* 일정 추가 바텀 시트 */}
+      {/* 일정 추가/수정 바텀 시트 */}
       <AnimatePresence>
         {(isAddOpen || isEditOpen) && (
           <>
@@ -270,7 +501,6 @@ export default function CalendarPage() {
       </AnimatePresence>
 
       <BottomNav 
-        onDateOpen={() => setIsDatePlannerOpen(true)}
         datePlannerProps={{
           initialDate: format(selectedDate, 'yyyy-MM-dd'),
           initialSchedules: selectedSchedules
