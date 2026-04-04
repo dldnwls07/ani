@@ -35,7 +35,10 @@ export function DatePlannerModal() {
     setSaving(true)
     
     try {
-      for (const item of result.items) {
+      // C-5: AI 추천 항목(isAI: true)만 필터링하여 등록 (기존 일정 중복 방지)
+      const aiItems = (result.items as any[]).filter(it => it.isAI !== false)
+
+      for (const item of aiItems) {
         const [hours, minutes] = item.time.split(':').map(Number)
         const startDate = new Date(localDate)
         startDate.setHours(hours, minutes, 0, 0)
@@ -55,7 +58,7 @@ export function DatePlannerModal() {
           locationData: { name: item.place }
         })
       }
-      alert('모든 일정이 캘린더에 등록되었습니다! 💕')
+      alert('새로운 추천 일정이 캘린더에 등록되었습니다! 💕')
       clear() // 스토어 초기화
       closeModal()
       
@@ -165,36 +168,50 @@ export function DatePlannerModal() {
                   </div>
 
                   <div className="space-y-4">
-                    {result.items.map((item, idx) => (
-                      <motion.div 
-                        key={idx} 
-                        initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.1 }}
-                        className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm flex items-start gap-5 group hover:border-rose-200 transition-all"
-                      >
-                        <div className="flex flex-col items-center gap-2 shrink-0">
-                          <div className="w-12 h-12 bg-rose-50 rounded-2xl flex items-center justify-center text-rose-500 font-black text-xs">
-                            {item.time}
+                    {(result.items as any[]).map((item, idx) => {
+                      const isAI = item.isAI !== false;
+                      return (
+                        <motion.div 
+                          key={idx} 
+                          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.1 }}
+                          className={`p-6 rounded-[2.5rem] border shadow-sm flex items-start gap-5 group transition-all ${
+                            isAI ? 'bg-white border-gray-100 hover:border-rose-200' : 'bg-gray-50 border-gray-200 opacity-80'
+                          }`}
+                        >
+                          <div className="flex flex-col items-center gap-2 shrink-0">
+                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-xs ${
+                              isAI ? 'bg-rose-50 text-rose-500' : 'bg-gray-200 text-gray-500'
+                            }`}>
+                              {item.time}
+                            </div>
+                            {idx < result.items.length - 1 && (
+                              <div className="w-0.5 h-12 bg-gray-100 rounded-full" />
+                            )}
                           </div>
-                          {idx < result.items.length - 1 && (
-                            <div className="w-0.5 h-12 bg-gray-50 rounded-full" />
-                          )}
-                        </div>
-                        
-                        <div className="flex-1 min-w-0 pt-1">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="px-3 py-1 bg-gray-50 text-[10px] font-black text-gray-400 rounded-full uppercase tracking-wider">
-                              {item.category}
-                            </span>
+                          
+                          <div className="flex-1 min-w-0 pt-1">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className={`px-3 py-1 text-[10px] font-black rounded-full uppercase tracking-wider flex items-center gap-1 ${
+                                isAI ? 'bg-rose-50 text-rose-400' : 'bg-gray-200 text-gray-500'
+                              }`}>
+                                {isAI ? <Sparkles className="w-3 h-3" /> : <Calendar className="w-3 h-3" />}
+                                {isAI ? item.category : 'OUR SCHEDULE'}
+                              </span>
+                            </div>
+                            <h4 className={`text-lg font-black flex items-center gap-2 truncate ${
+                              isAI ? 'text-gray-800' : 'text-gray-500'
+                            }`}>
+                              {item.place}
+                            </h4>
+                            <p className={`text-sm font-bold mt-2 leading-relaxed ${
+                              isAI ? 'text-gray-500' : 'text-gray-400 italic'
+                            }`}>
+                              {item.recommendation}
+                            </p>
                           </div>
-                          <h4 className="text-lg font-black text-gray-800 flex items-center gap-2 truncate">
-                            {item.place}
-                          </h4>
-                          <p className="text-sm font-bold text-gray-500 mt-2 leading-relaxed">
-                            {item.recommendation}
-                          </p>
-                        </div>
-                      </motion.div>
-                    ))}
+                        </motion.div>
+                      )
+                    })}
                   </div>
                 </div>
               )}
@@ -217,7 +234,7 @@ export function DatePlannerModal() {
                   {saving ? (
                     <><Loader2 className="w-5 h-5 animate-spin" /> 저장 중...</>
                   ) : (
-                    <><Heart className="w-5 h-5 fill-white" /> 일정에 모두 추가</>
+                    <><Heart className="w-5 h-5 fill-white" /> 추천 일정 추가</>
                   )}
                 </button>
               </div>

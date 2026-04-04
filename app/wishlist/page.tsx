@@ -23,7 +23,7 @@ export default function WishlistPage() {
   // 위시리스트 로드
   const fetchWishlist = async () => {
     if (!couple) return
-    const { data, error } = await wishlistUseCase.getWishlist(couple.id as any)
+    const { data, error } = await wishlistUseCase.getWishlist(couple.id)
     if (!error && data) setWishlist(data)
   }
 
@@ -35,8 +35,8 @@ export default function WishlistPage() {
   const handleAddWish = async () => {
     if (!newTitle.trim() || !user || !couple) return
     const { data, error } = await wishlistUseCase.createWish({
-      coupleId: couple.id as any,
-      creatorId: user.id as any,
+      coupleId: couple.id,
+      creatorId: user.id,
       title: newTitle,
       pioneerUrl: newUrl,
       category: newCategory

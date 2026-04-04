@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { differenceInDays, parseISO, addDays } from 'date-fns'
 import { 
@@ -53,6 +53,54 @@ export default function DashboardPage() {
   // 2. 실시간 동기화 훅 가동!
   useRealtimeSync()
 
+  // 3. 실시간 인터랙션 수신 (Partner -> Me)
+  useEffect(() => {
+    const onPartnerPoke = () => {
+      setShowPokeEffect(true)
+      setTimeout(() => setShowPokeEffect(false), 2500)
+    }
+    const onPartnerHeart = () => {
+      setShowHeartEffect(true)
+      setTimeout(() => setShowHeartEffect(false), 2500)
+    }
+
+    window.addEventListener('partner-poke', onPartnerPoke)
+    window.addEventListener('partner-heart', onPartnerHeart)
+    return () => {
+      window.removeEventListener('partner-poke', onPartnerPoke)
+      window.removeEventListener('partner-heart', onPartnerHeart)
+    }
+  }, [])
+
+  /**
+   * [Core] 실시간 인터랙션 전송 (Me -> Partner)
+   * DB를 거치지 않고 Supabase Realtime Broadcast를 통해 즉시 전달합니다.
+   */
+  const sendInteraction = useCallback(async (type: 'poke' | 'heart') => {
+    if (!couple || !user) return
+
+    // 시각 효과 즉시 실행 (내 화면)
+    if (type === 'poke') {
+      setShowPokeEffect(true)
+      setTimeout(() => setShowPokeEffect(false), 2000)
+    } else {
+      setShowHeartEffect(true)
+      setTimeout(() => setShowHeartEffect(false), 2000)
+    }
+
+    // 상대방에게 전송
+    const channel = supabaseBrowser.channel(`couple-realtime-${couple.id}`)
+    await channel.send({
+      type: 'broadcast',
+      event: 'interaction',
+      payload: { 
+        type, 
+        senderId: user.id,
+        senderNickname: user.nickname
+      }
+    })
+  }, [couple, user])
+
   // 3. 내 상태 수정 함수
   const updateMyStatus = async (message: string) => {
     if (!user) return
@@ -83,18 +131,6 @@ export default function DashboardPage() {
     await supabaseBrowser.auth.signOut()
     setUser(null)
     router.push('/login')
-  }
-
-  // 4. 하트 발송 시각 효과 (임기응변!)
-  const sendHeartEffect = () => {
-    setShowHeartEffect(true)
-    setTimeout(() => setShowHeartEffect(false), 2000)
-  }
-
-  // 5. 콕 찌르기 시각 효과
-  const sendPokeEffect = () => {
-    setShowPokeEffect(true)
-    setTimeout(() => setShowPokeEffect(false), 2000)
   }
 
   // 하이드레이션 전에는 로딩 중으로 표시 (mounted 확인 후에도 데이터 없으면 안내)
@@ -235,14 +271,14 @@ export default function DashboardPage() {
 
         <div className="grid grid-cols-2 gap-3 mt-8 w-full">
           <button 
-            onClick={sendPokeEffect}
+            onClick={() => sendInteraction('poke')}
             className="flex items-center justify-center space-x-2 px-4 py-3 bg-rose-50 text-rose-500 rounded-2xl hover:bg-rose-100 transition active:scale-95 font-bold text-sm shadow-sm ring-1 ring-rose-100/50"
           >
             <Hand className="w-4 h-4" />
             <span>콕 찌르기</span>
           </button>
           <button 
-            onClick={sendHeartEffect}
+            onClick={() => sendInteraction('heart')}
             className="flex items-center justify-center space-x-2 px-4 py-3 bg-pink-500 text-white rounded-2xl hover:bg-pink-600 transition active:scale-95 font-bold text-sm shadow-lg shadow-pink-200"
           >
             <Heart className="w-4 h-4 fill-white" />

@@ -12,6 +12,7 @@ import { scheduleUseCase } from '@/application/schedule/usecases/ScheduleUseCase
 import { BottomNav } from '@/components/BottomNav'
 import { useDatePlannerStore } from '@/hooks/useDatePlannerStore'
 import Link from 'next/link'
+import { supabaseBrowser } from '@/infrastructure/supabase/client'
 
 import { Schedule } from '@/domain/schedule/entities/Schedule'
 
@@ -69,6 +70,12 @@ export default function CalendarPage() {
     const start = parseISO(couple.connectionDate)
     const items = []
     
+    // 만난 날
+    items.push({
+      date: start,
+      title: '만난 날 💕'
+    })
+
     // 100일 단위 (100~1000일)
     for (let i = 1; i <= 10; i++) {
       const days = i * 100
@@ -107,12 +114,37 @@ export default function CalendarPage() {
     fetchSchedules()
   }, [currentMonth, couple])
 
-  // 전역 이벤트를 통한 일정 갱신 감지 (DatePlanner 등에서 발생)
+  // 실시간 동기화 및 전역 이벤트를 통한 일정 갱신 감지
   useEffect(() => {
+    if (!couple) return
+
+    // 1. 전역 이벤트 감지 (내 로컬 작업용)
     const handleUpdate = () => fetchSchedules()
     window.addEventListener('schedule-updated', handleUpdate)
-    return () => window.removeEventListener('schedule-updated', handleUpdate)
-  }, [])
+
+    // 2. Supabase Realtime 구독 (상대방 작업용)
+    const channel = supabaseBrowser
+      .channel(`calendar-sync-${couple.id}`)
+      .on(
+        'postgres_changes',
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'schedules', 
+          filter: `couple_id=eq.${couple.id}` 
+        },
+        () => {
+          console.log('[Realtime] Schedule change detected, fetching...')
+          fetchSchedules()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      window.removeEventListener('schedule-updated', handleUpdate)
+      supabaseBrowser.removeChannel(channel)
+    }
+  }, [couple, currentMonth])
 
   const openAddModal = useCallback(() => {
     setNewTitle('')

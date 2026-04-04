@@ -7,12 +7,15 @@ import { UUID, Result } from '@/domain/shared/types'
 
 const IS_MOCK_UUID = (id: string) => id.startsWith('00000000-0000-0000-0000-000000000');
 
+// Mock 모드용 인메모리 저장소
+let mockWishlist: WishItem[] = [];
+
 export class WishlistUseCase {
   // 커플의 위시리스트 전체 조회
   async getWishlist(coupleId: UUID): Promise<Result<WishItem[]>> {
     if (IS_MOCK_UUID(coupleId)) {
-      console.log('[WishlistUseCase] Mock mode: skipping fetch');
-      return { data: [], error: null };
+      console.log('[WishlistUseCase] Mock mode: returning in-memory wishlist');
+      return { data: mockWishlist, error: null };
     }
 
     const { data, error } = await supabaseBrowser
@@ -41,13 +44,14 @@ export class WishlistUseCase {
   // 위시 생성
   async createWish(wish: Omit<WishItem, 'id' | 'createdAt' | 'agreedBy'>): Promise<Result<WishItem>> {
     if (IS_MOCK_UUID(wish.coupleId as string)) {
-      console.log('[WishlistUseCase] Mock mode: skipping create');
+      console.log('[WishlistUseCase] Mock mode: persisting to in-memory store');
       const mockItem: WishItem = {
         id: crypto.randomUUID() as UUID,
         ...wish,
         agreedBy: [],
         createdAt: new Date().toISOString()
       };
+      mockWishlist.push(mockItem);
       return { data: mockItem, error: null };
     }
 
@@ -65,7 +69,19 @@ export class WishlistUseCase {
       .single()
 
     if (error) return { data: null, error: error.message }
-    return { data: data as any, error: null }
+    
+    const mapped: WishItem = {
+      id: data.id,
+      coupleId: data.couple_id,
+      creatorId: data.creator_id,
+      title: data.title,
+      pioneerUrl: data.pioneer_url,
+      category: data.category as WishCategory,
+      agreedBy: data.agreed_by,
+      createdAt: data.created_at
+    }
+    
+    return { data: mapped, error: null }
   }
 
   // 좋아요(동의) 토글
@@ -78,7 +94,11 @@ export class WishlistUseCase {
     }
 
     if (IS_MOCK_UUID(userId as string)) {
-      console.log('[WishlistUseCase] Mock mode: skipping toggle agree');
+      console.log('[WishlistUseCase] Mock mode: updating in-memory toggled agree');
+      const item = mockWishlist.find(w => w.id === wishId);
+      if (item) {
+        item.agreedBy = newAgreed;
+      }
       return { data: newAgreed, error: null };
     }
 
@@ -93,8 +113,9 @@ export class WishlistUseCase {
 
   // 위시 삭제
   async deleteWish(id: UUID): Promise<Result<void>> {
-    if (IS_MOCK_UUID(id as string)) {
-       console.log('[WishlistUseCase] Mock mode: skipping delete');
+    if (mockWishlist.some(w => w.id === id)) {
+       console.log('[WishlistUseCase] Mock mode: deleting from in-memory store');
+       mockWishlist = mockWishlist.filter(w => w.id !== id);
        return { data: null, error: null };
     }
 
