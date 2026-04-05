@@ -1,54 +1,31 @@
 // ============================================================
-// AuthUseCase - 인증 관련 유즈케이스
+// AuthUseCase - 인증 관련 유즈케이스 (Repository 주입 버전)
 // ============================================================
-import { supabaseBrowser } from '@/infrastructure/supabase/client'
+import { IAuthRepository, SupabaseAuthRepository } from '@/infrastructure/supabase/repositories/SupabaseAuthRepository'
+import { User } from '@/domain/user/entities/User'
+import { Result } from '@/domain/shared/types'
 
 export class AuthUseCase {
+  constructor(private authRepository: IAuthRepository = new SupabaseAuthRepository()) {}
+
   // 이메일/비밀번호 로그인
-  async signIn(email: string, password: string) {
-    const { data, error } = await supabaseBrowser.auth.signInWithPassword({
-      email,
-      password,
-    })
-    if (error) return { data: null, error: error.message }
-    return { data: data.user, error: null }
+  async signIn(email: string, password: string): Promise<Result<User>> {
+    return this.authRepository.signIn(email, password)
   }
 
   // 회원가입
-  async signUp(email: string, password: string, nickname: string) {
-    const { data, error } = await supabaseBrowser.auth.signUp({
-      email,
-      password,
-      options: { data: { nickname } },
-    })
-    if (error) return { data: null, error: error.message }
-    return { data: data.user, error: null }
+  async signUp(email: string, password: string, nickname: string): Promise<Result<User>> {
+    return this.authRepository.signUp(email, password, nickname)
   }
 
   // 로그아웃
-  async signOut() {
-    const { error } = await supabaseBrowser.auth.signOut()
-    if (error) return { error: error.message }
-    return { error: null }
-  }
-
-  // 구글 로그인
-  async signInWithGoogle() {
-    const { data, error } = await supabaseBrowser.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    })
-    if (error) return { error: error.message }
-    return { data, error: null }
+  async signOut(): Promise<Result<void>> {
+    return this.authRepository.signOut()
   }
 
   // 현재 세션 가져오기
-  async getSession() {
-    const { data, error } = await supabaseBrowser.auth.getSession()
-    if (error) return { data: null, error: error.message }
-    return { data: data.session, error: null }
+  async getSession(): Promise<Result<any>> {
+    return this.authRepository.getSession()
   }
 }
 

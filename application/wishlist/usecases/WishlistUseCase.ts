@@ -1,132 +1,75 @@
-// ============================================================
-// WishlistUseCase - 위시리스트 CRUD 및 비즈니스 로직
-// ============================================================
-import { supabaseBrowser } from '@/infrastructure/supabase/client'
-import { WishItem, WishCategory } from '@/domain/wishlist/entities/WishItem'
+import { supabaseBrowser } from '../client'
+import { Couple } from '@/domain/couple/entities/Couple'
+import { ICoupleRepository } from '@/domain/couple/repositories/ICoupleRepository'
 import { UUID, Result } from '@/domain/shared/types'
 
-const IS_MOCK_UUID = (id: string) => id.startsWith('00000000-0000-0000-0000-000000000');
-
-// Mock 모드용 인메모리 저장소
-let mockWishlist: WishItem[] = [];
-
-export class WishlistUseCase {
-  // 커플의 위시리스트 전체 조회
-  async getWishlist(coupleId: UUID): Promise<Result<WishItem[]>> {
-    if (IS_MOCK_UUID(coupleId)) {
-      console.log('[WishlistUseCase] Mock mode: returning in-memory wishlist');
-      return { data: mockWishlist, error: null };
+export class SupabaseCoupleRepository implements ICoupleRepository {
+  private mapToEntity(row: any): Couple {
+    return {
+      id: row.id,
+      inviteCode: row.invite_code,
+      partner1Id: row.partner_1_id,
+      partner2Id: row.partner_2_id,
+      connectionDate: row.connection_date,
+      themePreference: row.theme_preference,
+      createdAt: row.created_at,
     }
-
-    const { data, error } = await supabaseBrowser
-      .from('wishlists')
-      .select('*')
-      .eq('couple_id', coupleId)
-      .order('created_at', { ascending: false })
-
-    if (error) return { data: null, error: error.message }
-    
-    // DB의 snake_case 대응
-    const mapped: WishItem[] = data.map(item => ({
-      id: item.id,
-      coupleId: item.couple_id,
-      creatorId: item.creator_id,
-      title: item.title,
-      pioneerUrl: item.pioneer_url,
-      category: item.category as WishCategory,
-      agreedBy: item.agreed_by,
-      createdAt: item.created_at
-    }))
-    
-    return { data: mapped, error: null }
   }
 
-  // 위시 생성
-  async createWish(wish: Omit<WishItem, 'id' | 'createdAt' | 'agreedBy'>): Promise<Result<WishItem>> {
-    if (IS_MOCK_UUID(wish.coupleId as string)) {
-      console.log('[WishlistUseCase] Mock mode: persisting to in-memory store');
-      const mockItem: WishItem = {
-        id: crypto.randomUUID() as UUID,
-        ...wish,
-        agreedBy: [],
-        createdAt: new Date().toISOString()
-      };
-      mockWishlist.push(mockItem);
-      return { data: mockItem, error: null };
-    }
-
+  async findById(id: UUID): Promise<Result<Couple>> {
     const { data, error } = await supabaseBrowser
-      .from('wishlists')
+      .from('couples')
+      .select('*')
+      .eq('id', id)
+      .single()
+
+    if (error) return { data: null, error: error.message }
+    return { data: this.mapToEntity(data), error: null }
+  }
+
+  async findByInviteCode(code: string): Promise<Result<Couple>> {
+    const { data, error } = await supabaseBrowser
+      .from('couples')
+      .select('*')
+      .eq('invite_code', code)
+      .single()
+
+    if (error) return { data: null, error: error.message }
+    return { data: this.mapToEntity(data), error: null }
+  }
+
+  async create(couple: Omit<Couple, 'id' | 'createdAt'>): Promise<Result<Couple>> {
+    const { data, error } = await supabaseBrowser
+      .from('couples')
       .insert({
-        couple_id: wish.coupleId,
-        creator_id: wish.creatorId,
-        title: wish.title,
-        pioneer_url: wish.pioneerUrl,
-        category: wish.category,
-        agreed_by: []
+        invite_code: couple.inviteCode,
+        partner_1_id: couple.partner1Id,
+        connection_date: couple.connectionDate,
+        theme_preference: couple.themePreference,
       })
       .select()
       .single()
 
     if (error) return { data: null, error: error.message }
-    
-    const mapped: WishItem = {
-      id: data.id,
-      coupleId: data.couple_id,
-      creatorId: data.creator_id,
-      title: data.title,
-      pioneerUrl: data.pioneer_url,
-      category: data.category as WishCategory,
-      agreedBy: data.agreed_by,
-      createdAt: data.created_at
-    }
-    
-    return { data: mapped, error: null }
+    return { data: this.mapToEntity(data), error: null }
   }
 
-  // 좋아요(동의) 토글
-  async toggleAgree(wishId: UUID, userId: UUID, currentAgreed: UUID[]): Promise<Result<UUID[]>> {
-    let newAgreed: UUID[]
-    if (currentAgreed.includes(userId)) {
-      newAgreed = currentAgreed.filter(id => id !== userId)
-    } else {
-      newAgreed = [...currentAgreed, userId]
-    }
-
-    if (IS_MOCK_UUID(userId as string)) {
-      console.log('[WishlistUseCase] Mock mode: updating in-memory toggled agree');
-      const item = mockWishlist.find(w => w.id === wishId);
-      if (item) {
-        item.agreedBy = newAgreed;
-      }
-      return { data: newAgreed, error: null };
-    }
-
-    const { error } = await supabaseBrowser
-      .from('wishlists')
-      .update({ agreed_by: newAgreed })
-      .eq('id', wishId)
+  async matchPartner(inviteCode: string, partnerId: UUID): Promise<Result<UUID>> {
+    const { data, error } = await supabaseBrowser.rpc('match_couple', {
+      p_invite_code: inviteCode,
+    })
 
     if (error) return { data: null, error: error.message }
-    return { data: newAgreed, error: null }
+    return { data: data as UUID, error: null }
   }
 
-  // 위시 삭제
-  async deleteWish(id: UUID): Promise<Result<void>> {
-    if (mockWishlist.some(w => w.id === id)) {
-       console.log('[WishlistUseCase] Mock mode: deleting from in-memory store');
-       mockWishlist = mockWishlist.filter(w => w.id !== id);
-       return { data: null, error: null };
-    }
-
+  async updateTheme(id: UUID, theme: Couple['themePreference']): Promise<Result<void>> {
     const { error } = await supabaseBrowser
-      .from('wishlists')
-      .delete()
+      .from('couples')
+      .update({ theme_preference: theme })
       .eq('id', id)
 
     if (error) return { data: null, error: error.message }
     return { data: null, error: null }
   }
 }
-
-export const wishlistUseCase = new WishlistUseCase()

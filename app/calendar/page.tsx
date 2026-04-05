@@ -10,7 +10,6 @@ import { useAuthStore } from '@/hooks/useAuthStore'
 import { useCoupleStore } from '@/hooks/useCoupleStore'
 import { scheduleUseCase } from '@/application/schedule/usecases/ScheduleUseCase'
 import { BottomNav } from '@/components/BottomNav'
-import { useDatePlannerStore } from '@/hooks/useDatePlannerStore'
 import Link from 'next/link'
 import { supabaseBrowser } from '@/infrastructure/supabase/client'
 
@@ -49,7 +48,6 @@ export default function CalendarPage() {
   const { currentMonth, selectedDate, calendarDays, setSelectedDate, nextMonth, prevMonth, formatTitle, isToday, isSameMonth, isSelected } = useCalendar()
   const { user } = useAuthStore()
   const { couple } = useCoupleStore()
-  const { openModal: openDatePlanner } = useDatePlannerStore()
   
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [isEditOpen, setIsEditOpen] = useState(false)
@@ -259,8 +257,14 @@ export default function CalendarPage() {
           <h1 className="text-xl font-black text-gray-800 tracking-tight">{formatTitle()}</h1>
         </div>
         <div className="flex space-x-1">
-          <button onClick={prevMonth} className="p-2 bg-gray-50 rounded-full text-gray-400"><ChevronLeft className="w-4 h-4" /></button>
-          <button onClick={nextMonth} className="p-2 bg-gray-50 rounded-full text-gray-400"><ChevronRight className="w-4 h-4" /></button>
+          <button onClick={prevMonth} className="p-2 bg-gray-50 rounded-full text-gray-400 hover:bg-rose-50 hover:text-rose-400 transition-colors"><ChevronLeft className="w-4 h-4" /></button>
+          <button 
+            onClick={() => setSelectedDate(new Date())}
+            className="px-3 py-1 bg-rose-50 text-rose-500 rounded-full text-[10px] font-black hover:bg-rose-100 transition-colors uppercase tracking-widest"
+          >
+            오늘
+          </button>
+          <button onClick={nextMonth} className="p-2 bg-gray-50 rounded-full text-gray-400 hover:bg-rose-50 hover:text-rose-400 transition-colors"><ChevronRight className="w-4 h-4" /></button>
         </div>
       </header>
 
@@ -376,7 +380,7 @@ export default function CalendarPage() {
                           </span>
                         )}
                         {locationName && (
-                          <span className="px-2 py-0.5 bg-gray-50 text-[10px] font-bold text-gray-400 rounded-full border border-gray-100 flex items-center gap-1">
+                          <span className="px-2 py-0.5 bg-rose-50/50 text-[10px] font-bold text-rose-400 rounded-full border border-rose-100/50 flex items-center gap-1">
                             <MapPin className="w-3 h-3" /> {locationName}
                           </span>
                         )}
@@ -415,23 +419,8 @@ export default function CalendarPage() {
             )}
           </div>
 
-          {/* AI 데이트 추천 섹션 */}
-          {selectedSchedules.length > 0 && (
-            <div className="pt-4 border-t border-gray-100">
-              <button
-                onClick={() => openDatePlanner(format(selectedDate, 'yyyy-MM-dd'))}
-                className="w-full py-5 bg-gradient-to-br from-indigo-600 via-purple-600 to-rose-50 rounded-[2rem] flex items-center justify-center space-x-3 text-white shadow-xl shadow-purple-100 active:scale-[0.98] transition-all group"
-              >
-                <div className="w-8 h-8 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
-                  <Bot className="w-5 h-5 text-white" />
-                </div>
-                <span className="font-black text-sm tracking-tight">
-                  이날의 데이트 코스 조율하기
-                </span>
-                <Sparkles className="w-4 h-4 text-yellow-300 animate-pulse" />
-              </button>
-            </div>
-          )}
+          {/* 공백 추가 */}
+          <div className="h-20" />
         </div>
       </div>
 

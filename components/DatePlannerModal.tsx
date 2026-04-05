@@ -208,6 +208,18 @@ export function DatePlannerModal() {
                             }`}>
                               {item.recommendation}
                             </p>
+
+                            {isAI && item.mapUrl && (
+                              <a 
+                                href={item.mapUrl} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 bg-gray-50 text-[10px] font-black text-gray-400 hover:text-rose-500 hover:bg-rose-50 rounded-full border border-gray-100/50 transition-all"
+                              >
+                                {item.source === 'naver' ? '네이버 지도에서 보기' : '카카오 맵에서 보기'}
+                                <ArrowRight className="w-3 h-3" />
+                              </a>
+                            )}
                           </div>
                         </motion.div>
                       )

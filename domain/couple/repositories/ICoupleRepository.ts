@@ -8,6 +8,6 @@ export interface ICoupleRepository {
   findById(id: UUID): Promise<Result<Couple>>
   findByInviteCode(code: string): Promise<Result<Couple>>
   create(couple: Omit<Couple, 'id' | 'createdAt'>): Promise<Result<Couple>>
-  matchPartner(inviteCode: string, partnerId: UUID): Promise<Result<UUID>>
+  matchPartner(inviteCode: string): Promise<Result<UUID>>
   updateTheme(id: UUID, theme: Couple['themePreference']): Promise<Result<void>>
 }

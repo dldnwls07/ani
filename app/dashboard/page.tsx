@@ -12,8 +12,7 @@ import {
   MessageCircle, 
   User as UserIcon, 
   Sun,
-  Bookmark,
-  Hand
+  Bot
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -21,16 +20,17 @@ import { useAuthStore } from '@/hooks/useAuthStore'
 import { useCoupleStore } from '@/hooks/useCoupleStore'
 import { useRealtimeSync } from '@/hooks/useRealtimeSync'
 import { supabaseBrowser } from '@/infrastructure/supabase/client'
+import { useDatePlannerStore } from '@/hooks/useDatePlannerStore'
 import { User } from '@/domain/user/entities/User'
 import { BottomNav } from '@/components/BottomNav'
+import { format } from 'date-fns'
 
 export default function DashboardPage() {
   const router = useRouter()
   const { user, setUser } = useAuthStore()
   const { couple, partner, setPartner } = useCoupleStore()
+  const { openModal } = useDatePlannerStore()
   const [updateStatusLoading, setUpdateStatusLoading] = useState(false)
-  const [showHeartEffect, setShowHeartEffect] = useState(false)
-  const [showPokeEffect, setShowPokeEffect] = useState(false)
   const [isMounted, setIsMounted] = useState(false)
   const [showForceReset, setShowForceReset] = useState(false)
 
@@ -38,13 +38,12 @@ export default function DashboardPage() {
   useEffect(() => {
     setIsMounted(true)
     const timer = setTimeout(() => {
-      // 4초가 지나도 사용자 정보가 없으면 초기화 버튼 노출
       if (!user || !couple) setShowForceReset(true)
     }, 4000)
     return () => clearTimeout(timer)
   }, [user, couple])
 
-  // 강제 초기화 함수 (개발용 - 로컬 스토리지 충돌 해결)
+  // 강제 초기화 함수 (개발용)
   const handleForceReset = () => {
     localStorage.clear()
     window.location.reload()
@@ -52,54 +51,6 @@ export default function DashboardPage() {
 
   // 2. 실시간 동기화 훅 가동!
   useRealtimeSync()
-
-  // 3. 실시간 인터랙션 수신 (Partner -> Me)
-  useEffect(() => {
-    const onPartnerPoke = () => {
-      setShowPokeEffect(true)
-      setTimeout(() => setShowPokeEffect(false), 2500)
-    }
-    const onPartnerHeart = () => {
-      setShowHeartEffect(true)
-      setTimeout(() => setShowHeartEffect(false), 2500)
-    }
-
-    window.addEventListener('partner-poke', onPartnerPoke)
-    window.addEventListener('partner-heart', onPartnerHeart)
-    return () => {
-      window.removeEventListener('partner-poke', onPartnerPoke)
-      window.removeEventListener('partner-heart', onPartnerHeart)
-    }
-  }, [])
-
-  /**
-   * [Core] 실시간 인터랙션 전송 (Me -> Partner)
-   * DB를 거치지 않고 Supabase Realtime Broadcast를 통해 즉시 전달합니다.
-   */
-  const sendInteraction = useCallback(async (type: 'poke' | 'heart') => {
-    if (!couple || !user) return
-
-    // 시각 효과 즉시 실행 (내 화면)
-    if (type === 'poke') {
-      setShowPokeEffect(true)
-      setTimeout(() => setShowPokeEffect(false), 2000)
-    } else {
-      setShowHeartEffect(true)
-      setTimeout(() => setShowHeartEffect(false), 2000)
-    }
-
-    // 상대방에게 전송
-    const channel = supabaseBrowser.channel(`couple-realtime-${couple.id}`)
-    await channel.send({
-      type: 'broadcast',
-      event: 'interaction',
-      payload: { 
-        type, 
-        senderId: user.id,
-        senderNickname: user.nickname
-      }
-    })
-  }, [couple, user])
 
   // 3. 내 상태 수정 함수
   const updateMyStatus = async (message: string) => {
@@ -262,29 +213,9 @@ export default function DashboardPage() {
           </motion.div>
         </div>
         
-        <h3 className="mt-6 font-extrabold text-xl text-gray-800">
-          <span className="text-rose-400">{partner?.nickname || '파트너'}</span>님은 지금
-        </h3>
-        <p className="text-sm text-gray-400 mt-1 font-medium italic">
+        <p className="mt-6 text-sm text-gray-400 font-medium italic">
           "{partner?.statusMessage || '연결을 기다리고 있어요'}"
         </p>
-
-        <div className="grid grid-cols-2 gap-3 mt-8 w-full">
-          <button 
-            onClick={() => sendInteraction('poke')}
-            className="flex items-center justify-center space-x-2 px-4 py-3 bg-rose-50 text-rose-500 rounded-2xl hover:bg-rose-100 transition active:scale-95 font-bold text-sm shadow-sm ring-1 ring-rose-100/50"
-          >
-            <Hand className="w-4 h-4" />
-            <span>콕 찌르기</span>
-          </button>
-          <button 
-            onClick={() => sendInteraction('heart')}
-            className="flex items-center justify-center space-x-2 px-4 py-3 bg-pink-500 text-white rounded-2xl hover:bg-pink-600 transition active:scale-95 font-bold text-sm shadow-lg shadow-pink-200"
-          >
-            <Heart className="w-4 h-4 fill-white" />
-            <span>하트 뿅</span>
-          </button>
-        </div>
       </section>
 
       {/* 내 상태 관리 (여기서 상태를 바꿀 수 있음) */}
@@ -308,62 +239,51 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      {/* 퀵 메뉴 (캘린더 / 버킷리스트) */}
-      <section className="grid grid-cols-2 gap-4 pb-6">
-        <Link href="/calendar" className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col items-center justify-center space-y-3 hover:border-rose-200 transition-all hover:shadow-md active:scale-[0.98]">
-          <div className="w-14 h-14 bg-rose-50 rounded-2xl flex items-center justify-center">
-            <Calendar className="w-7 h-7 text-rose-500" />
+      <section className="pb-4">
+        <Link href="/calendar" className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 flex items-center justify-between hover:border-rose-200 transition-all active:scale-[0.99] group">
+          <div className="flex items-center space-x-4">
+            <div className="w-14 h-14 bg-rose-50 rounded-2xl flex items-center justify-center group-hover:bg-rose-100 transition-colors">
+              <Calendar className="w-7 h-7 text-rose-500" />
+            </div>
+            <div>
+              <span className="block text-lg font-black text-gray-800 tracking-tight">우리의 캘린더</span>
+              <span className="block text-xs font-bold text-gray-400 mt-0.5">일정 관리하기</span>
+            </div>
           </div>
-          <div className="text-center">
-            <span className="block text-sm font-black text-gray-800 tracking-tight">우리의 캘린더</span>
-            <span className="block text-[10px] font-bold text-gray-400 mt-0.5">일정 관리하기</span>
-          </div>
-        </Link>
-        
-        <Link href="/wishlist" className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col items-center justify-center space-y-3 hover:border-rose-200 transition-all hover:shadow-md active:scale-[0.98]">
-          <div className="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center">
-            <Bookmark className="w-7 h-7 text-indigo-500" />
-          </div>
-          <div className="text-center">
-            <span className="block text-sm font-black text-gray-800 tracking-tight">버킷리스트</span>
-            <span className="block text-[10px] font-bold text-gray-400 mt-0.5">함께하고 싶은 것</span>
+          <div className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center text-gray-300">
+            <Calendar className="w-4 h-4" />
           </div>
         </Link>
       </section>
 
-      {/* 공통 하단 네비게이션 (채팅/데이트 모달 내장) */}
+      {/* AI 데이트 코스 추천 (메인 피처) */}
+      <section className="pb-10">
+        <button
+          onClick={() => openModal(format(new Date(), 'yyyy-MM-dd'))}
+          className="w-full py-8 bg-gradient-to-br from-indigo-600 via-purple-600 to-rose-400 rounded-[2.5rem] flex flex-col items-center justify-center space-y-3 text-white shadow-2xl shadow-purple-200 active:scale-[0.98] transition-all group relative overflow-hidden"
+        >
+          <div className="absolute top-0 right-0 p-4 opacity-20">
+            <Sparkles className="w-20 h-20" />
+          </div>
+          
+          <div className="w-16 h-16 bg-white/20 rounded-3xl flex items-center justify-center backdrop-blur-xl border border-white/30 shadow-inner">
+            <Bot className="w-10 h-10 text-white" />
+          </div>
+          
+          <div className="text-center">
+            <span className="block text-xl font-black tracking-tight">AI 데이트 코스 조율하기</span>
+            <span className="block text-xs font-bold text-white/70 mt-1">네이버/카카오 API 실시간 장소 추천</span>
+          </div>
+          
+          <div className="flex items-center space-x-1.5 px-4 py-1.5 bg-white/10 rounded-full backdrop-blur-sm border border-white/10">
+            <Sparkles className="w-3 h-3 text-yellow-300" />
+            <span className="text-[10px] font-black uppercase tracking-widest text-white/90 underline underline-offset-4">Harness Engine v2.5</span>
+          </div>
+        </button>
+      </section>
+
+      {/* 공통 하단 네비게이션 */}
       <BottomNav />
-
-
-      {/* 하트 발송 시각 효과 */}
-      <AnimatePresence>
-        {showHeartEffect && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.5, y: 0 }}
-            animate={{ opacity: 1, scale: 2, y: -200 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 flex items-center justify-center pointer-events-none z-[100]"
-          >
-            <Heart className="w-20 h-20 text-pink-500 fill-pink-500" />
-          </motion.div>
-        )}
-      </AnimatePresence>
-      {/* 콕 찌르기 시각 효과 */}
-      <AnimatePresence>
-        {showPokeEffect && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.5, x: 50, rotate: 15 }}
-            animate={{ opacity: 1, scale: 1.5, x: -50, rotate: -15 }}
-            exit={{ opacity: 0, scale: 0.8 }}
-            className="fixed inset-0 flex items-center justify-center pointer-events-none z-[100]"
-          >
-            <div className="bg-white px-6 py-4 rounded-full shadow-2xl border-4 border-rose-100 flex items-center space-x-3 transform -rotate-12">
-              <Hand className="w-8 h-8 text-rose-400" />
-              <span className="text-xl font-black text-rose-500 tracking-wider">콕!</span>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   )
 }
